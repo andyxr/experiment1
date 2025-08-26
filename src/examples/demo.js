@@ -73,6 +73,12 @@ class PixelMovementDemo {
                 displayId: 'threshold-value',
                 parameterName: 'regionThreshold',
                 parser: parseInt
+            },
+            {
+                sliderId: 'gravity-strength',
+                displayId: 'gravity-value',
+                parameterName: 'gravityStrength',
+                parser: parseFloat
             }
         ];
         
@@ -338,7 +344,8 @@ class PixelMovementDemo {
             ['movement-speed', params.movementSpeed],
             ['noise-scale', params.noiseScale],
             ['brightness-sensitivity', params.brightnessSensitivity],
-            ['region-threshold', params.regionThreshold]
+            ['region-threshold', params.regionThreshold],
+            ['gravity-strength', params.gravityStrength]
         ];
         
         updates.forEach(([id, value]) => {
@@ -361,6 +368,11 @@ class PixelMovementDemo {
     visualizeFlowField() {
         this.movementEngine.visualizeFlowField(0.3);
         this.updateStatus('Showing flow field visualization.');
+    }
+
+    visualizeGravityWells() {
+        this.movementEngine.visualizeGravityWells();
+        this.updateStatus('Showing gravity wells visualization.');
     }
 
     visualizeDisplacement() {

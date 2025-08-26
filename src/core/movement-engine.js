@@ -14,6 +14,7 @@ class MovementEngine {
             noiseScale: 0.01,
             brightnessSensitivity: 1.0,
             regionThreshold: 30,
+            gravityStrength: 0.0,
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -25,6 +26,10 @@ class MovementEngine {
         this.frameCount = 0;
         this.exportFrames = [];
         this.isRecording = false;
+        
+        // Gravity system
+        this.gravityWells = [];
+        this.gravityRadius = 80; // Pixels within this radius are affected
     }
 
     initialize(canvas) {
@@ -42,6 +47,7 @@ class MovementEngine {
         );
         this.pixelManipulator.setRegions(this.regions);
         this.generateFlowField();
+        this.generateGravityWells();
         
         return this.regions;
     }
@@ -53,6 +59,11 @@ class MovementEngine {
             // Trigger flow field regeneration for relevant parameters
             if (['noiseScale', 'flowFieldType', 'flowStrength'].includes(name)) {
                 this.generateFlowField();
+            }
+            
+            // Trigger gravity wells regeneration for gravity changes
+            if (name === 'gravityStrength') {
+                this.generateGravityWells();
             }
             
             // Update image analysis for threshold changes
@@ -108,6 +119,81 @@ class MovementEngine {
         this.pixelManipulator.setFlowField(flowField);
     }
 
+    generateGravityWells() {
+        if (!this.pixelManipulator.width || !this.pixelManipulator.height || this.params.gravityStrength <= 0) {
+            this.gravityWells = [];
+            return;
+        }
+        
+        // Much more reasonable number of gravity wells - not based on total pixels
+        const wellCount = Math.min(10, Math.floor(this.params.gravityStrength * 2)); // Max 10 wells
+        
+        this.gravityWells = [];
+        for (let i = 0; i < wellCount; i++) {
+            this.gravityWells.push({
+                x: Math.random() * this.pixelManipulator.width,
+                y: Math.random() * this.pixelManipulator.height,
+                strength: this.params.gravityStrength * (0.5 + Math.random() * 0.5) // Vary strength
+            });
+        }
+    }
+
+    applyGravityForces() {
+        if (this.params.gravityStrength <= 0 || this.gravityWells.length === 0) return;
+        
+        const pixelPositions = this.pixelManipulator.pixelPositions;
+        const pixelVelocities = this.pixelManipulator.pixelVelocities;
+        
+        // Sample pixels for performance - process 10x more pixels for stronger effect
+        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 50000)); // Process max 50000 pixels (10x more)
+        let forcesApplied = 0; // Debug counter
+        
+        for (let i = 0; i < pixelPositions.length; i += sampleRate) {
+            const pixel = pixelPositions[i];
+            
+            // Apply force from each nearby gravity well
+            for (let well of this.gravityWells) {
+                const dx = well.x - pixel.x;
+                const dy = well.y - pixel.y;
+                const distanceSquared = dx * dx + dy * dy;
+                const distance = Math.sqrt(distanceSquared);
+                
+                // Only affect pixels within gravity radius
+                if (distance < this.gravityRadius && distance > 1) {
+                    // DRAMATICALLY stronger gravity force!
+                    const force = (well.strength * 100.0) / Math.max(distance, 10); // Maximum intensity!
+                    const forceX = (dx / distance) * force;
+                    const forceY = (dy / distance) * force;
+                    
+                    // Apply force more aggressively - directly move pixels toward gravity wells
+                    const oldVelX = pixelVelocities[i].x;
+                    const oldVelY = pixelVelocities[i].y;
+                    
+                    // Add to velocity AND directly to position for immediate effect
+                    pixelVelocities[i].x += forceX * sampleRate * 3; // Triple the force
+                    pixelVelocities[i].y += forceY * sampleRate * 3;
+                    
+                    // Also directly move pixel slightly toward well for immediate visible effect
+                    const directMoveStrength = well.strength * 0.1;
+                    pixelPositions[i].x += (dx / distance) * directMoveStrength;
+                    pixelPositions[i].y += (dy / distance) * directMoveStrength;
+                    
+                    forcesApplied++;
+                    
+                    // Debug first few applications
+                    if (forcesApplied < 3) {
+                        console.log(`Strong gravity on pixel ${i}: force(${forceX.toFixed(3)}, ${forceY.toFixed(3)}) vel ${oldVelX.toFixed(3)} -> ${pixelVelocities[i].x.toFixed(3)}`);
+                    }
+                }
+            }
+        }
+        
+        // Debug logging every 120 frames (about every 4 seconds)
+        if (this.frameCount % 120 === 0 && forcesApplied > 0) {
+            console.log(`Gravity: ${this.gravityWells.length} wells, ${forcesApplied} forces applied, strength: ${this.params.gravityStrength}`);
+        }
+    }
+
     startAnimation() {
         if (this.isRunning) return;
         
@@ -137,6 +223,14 @@ class MovementEngine {
             this.perlinFlow.advanceTime(this.params.timeStep);
             this.generateFlowField();
         }
+        
+        // Regenerate gravity wells occasionally for more chaos
+        if (this.frameCount % 120 === 0) { // Every 4 seconds at 30fps
+            this.generateGravityWells();
+        }
+        
+        // Apply gravity forces before updating positions
+        this.applyGravityForces();
         
         // Update pixel positions
         this.pixelManipulator.updatePixelPositions(
@@ -341,6 +435,30 @@ class MovementEngine {
         if (this.pixelManipulator.flowField) {
             this.perlinFlow.visualizeField(this.canvas, this.pixelManipulator.flowField, 15, alpha);
         }
+    }
+
+    visualizeGravityWells() {
+        if (!this.gravityWells.length) return;
+        
+        const ctx = this.ctx;
+        ctx.save();
+        
+        this.gravityWells.forEach(well => {
+            // Draw gravity well as a bright circle
+            ctx.fillStyle = `rgba(255, 0, 255, 0.8)`; // Bright magenta
+            ctx.beginPath();
+            ctx.arc(well.x, well.y, 5 + well.strength, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw influence radius
+            ctx.strokeStyle = `rgba(255, 0, 255, 0.3)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(well.x, well.y, this.gravityRadius, 0, Math.PI * 2);
+            ctx.stroke();
+        });
+        
+        ctx.restore();
     }
 
     getStats() {

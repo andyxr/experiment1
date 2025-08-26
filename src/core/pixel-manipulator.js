@@ -113,7 +113,7 @@ class PixelManipulator {
             const totalForceX = flowVector.x * 0.6 + brightnessForce.x * 0.25 + regionForce.x * 0.1 + noiseForce.x * 0.05;
             const totalForceY = flowVector.y * 0.6 + brightnessForce.y * 0.25 + regionForce.y * 0.1 + noiseForce.y * 0.05;
             
-            // Update velocity with damping
+            // Update velocity with damping - PRESERVE existing velocity (includes gravity forces)
             const damping = 0.95;
             vel.x = vel.x * damping + totalForceX * deltaTime * movementSpeed;
             vel.y = vel.y * damping + totalForceY * deltaTime * movementSpeed;
