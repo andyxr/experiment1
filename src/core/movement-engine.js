@@ -49,6 +49,7 @@ class MovementEngine {
         // Trails system
         this.trailPixels = new Set(); // Pixels selected for trailing
         this.trailHistory = new Map(); // Stores trail positions for each pixel
+        this.pixelColorCache = new Map(); // Cache pixel colors to avoid repeated calculations
     }
 
     initialize(canvas) {
@@ -712,11 +713,14 @@ class MovementEngine {
         const trailPercentage = this.params.trails * 0.1; // 10% per level as originally intended
         let targetTrailCount = Math.floor(pixelPositions.length * trailPercentage);
         
-        // Only cap at lower trail values for performance
-        if (this.params.trails <= 5) {
-            targetTrailCount = Math.min(1000, targetTrailCount); // Cap at 1000 for levels 1-5
+        // Aggressive caps for performance at ALL levels
+        if (this.params.trails <= 3) {
+            targetTrailCount = Math.min(200, targetTrailCount); // Very low for levels 1-3
+        } else if (this.params.trails <= 7) {
+            targetTrailCount = Math.min(500, targetTrailCount); // Medium for levels 4-7
+        } else {
+            targetTrailCount = Math.min(800, targetTrailCount); // Still capped for levels 8-10
         }
-        // No cap for levels 6-10 to allow full coverage
         
         // Update trail pixel selection VERY infrequently to allow very long trails
         if (this.frameCount % 600 === 0) { // Every 600 frames (~20 seconds at 30fps)
@@ -726,7 +730,7 @@ class MovementEngine {
         
         // Apply trail effects to selected pixels - SIMPLIFIED for performance
         let trailsApplied = 0;
-        const maxTrailLength = 30 + (this.params.trails * 10); // MUCH longer trails: 30-130 segments
+        const maxTrailLength = 40 + (this.params.trails * 16); // Much longer trails: 40-200 segments
         
         for (let pixelIndex of this.trailPixels) {
             if (pixelIndex >= pixelPositions.length) continue;
@@ -779,6 +783,7 @@ class MovementEngine {
         for (let pixelIndex of this.trailHistory.keys()) {
             if (!this.trailPixels.has(pixelIndex)) {
                 this.trailHistory.delete(pixelIndex);
+                this.pixelColorCache.delete(pixelIndex); // Also cleanup color cache
             }
         }
     }
@@ -786,57 +791,54 @@ class MovementEngine {
     renderTrails() {
         if (this.params.trails <= 0 || !this.ctx) return;
         
+        // Render trails much less frequently for better performance  
+        if (this.frameCount % 4 !== 0) return; // Every 4th frame only
+        
         // Save canvas state
         this.ctx.save();
-        this.ctx.lineWidth = 2;
+        this.ctx.lineWidth = 1; // Thinner lines for better performance
+        this.ctx.strokeStyle = 'rgba(255,255,255,0.3)'; // Single white color for ALL trails
+        
+        // Draw ALL trails in a single path for maximum performance
+        this.ctx.beginPath();
         
         let trailsDrawn = 0;
-        
         for (let pixelIndex of this.trailPixels) {
             if (!this.trailHistory.has(pixelIndex)) continue;
             
             const trailData = this.trailHistory.get(pixelIndex);
             if (trailData.length < 2) continue;
             
-            // Get the original pixel color
-            const pixelColor = this.getPixelColor(pixelIndex);
-            
-            // Draw trail segments with fading alpha
-            let validTrail = true;
-            for (let i = 1; i < trailData.length; i++) {
-                // Check for teleportation jumps
-                const distance = Math.sqrt(
-                    Math.pow(trailData[i].x - trailData[i-1].x, 2) + 
-                    Math.pow(trailData[i].y - trailData[i-1].y, 2)
-                );
-                
-                if (distance > 50) {
-                    validTrail = false;
-                    break; // Skip this entire trail
+            // Check for teleportation jumps in more trail points
+            let hasValidTrail = true;
+            const pointsToCheck = Math.min(trailData.length, 30); // Check up to 30 points
+            for (let i = 1; i < pointsToCheck; i++) {
+                const dx = trailData[i].x - trailData[i-1].x;
+                const dy = trailData[i].y - trailData[i-1].y;
+                if (dx * dx + dy * dy > 2500) { // 50*50 = 2500
+                    hasValidTrail = false;
+                    break;
                 }
-                
-                // Calculate fade based on position in trail (newer = more opaque)
-                const fadeRatio = (trailData.length - i) / trailData.length; // 1.0 to 0.0
-                const alpha = fadeRatio * 0.8; // Max 80% opacity
-                
-                // Set color with fading alpha using original pixel color
-                this.ctx.strokeStyle = `rgba(${pixelColor.r}, ${pixelColor.g}, ${pixelColor.b}, ${alpha})`;
-                
-                // Draw this segment
-                this.ctx.beginPath();
-                this.ctx.moveTo(trailData[i-1].x, trailData[i-1].y);
-                this.ctx.lineTo(trailData[i].x, trailData[i].y);
-                this.ctx.stroke();
             }
             
-            if (!validTrail) continue;
+            if (!hasValidTrail) continue; // Skip trails with teleportation
+            
+            // Add MUCH longer trail to the single path
+            this.ctx.moveTo(trailData[0].x, trailData[0].y);
+            const pointsToDraw = Math.min(trailData.length, 40); // Draw up to 40 points (doubled!)
+            for (let i = 1; i < pointsToDraw; i++) {
+                this.ctx.lineTo(trailData[i].x, trailData[i].y);
+            }
             
             trailsDrawn++;
             
-            // Dynamic limit based on trail setting
-            const maxTrailsToRender = this.params.trails <= 5 ? 200 : 1000; // Much higher limit for high trail values
+            // Much more aggressive limits for performance
+            const maxTrailsToRender = this.params.trails <= 5 ? 30 : 60; // Even more reduced
             if (trailsDrawn >= maxTrailsToRender) break;
         }
+        
+        // Single stroke for ALL trails
+        this.ctx.stroke();
         
         // Restore canvas state
         this.ctx.restore();
