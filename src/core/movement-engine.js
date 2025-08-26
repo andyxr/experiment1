@@ -145,8 +145,8 @@ class MovementEngine {
         const pixelPositions = this.pixelManipulator.pixelPositions;
         const pixelVelocities = this.pixelManipulator.pixelVelocities;
         
-        // Sample pixels for performance - process 10x more pixels for stronger effect
-        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 50000)); // Process max 50000 pixels (10x more)
+        // Sample pixels for performance - process way more pixels for much stronger effect
+        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 200000)); // Process max 200000 pixels (4x more than before)
         let forcesApplied = 0; // Debug counter
         
         for (let i = 0; i < pixelPositions.length; i += sampleRate) {
@@ -162,7 +162,7 @@ class MovementEngine {
                 // Only affect pixels within gravity radius
                 if (distance < this.gravityRadius && distance > 1) {
                     // DRAMATICALLY stronger gravity force!
-                    const force = (well.strength * 100.0) / Math.max(distance, 10); // Maximum intensity!
+                    const force = (well.strength * 200.0) / Math.max(distance, 10); // Double intensity!
                     const forceX = (dx / distance) * force;
                     const forceY = (dy / distance) * force;
                     
