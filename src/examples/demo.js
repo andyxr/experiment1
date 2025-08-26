@@ -85,6 +85,12 @@ class PixelMovementDemo {
                 displayId: 'scatter-value',
                 parameterName: 'scatterStrength',
                 parser: parseInt
+            },
+            {
+                sliderId: 'random-mirrors',
+                displayId: 'mirrors-value',
+                parameterName: 'randomMirrors',
+                parser: parseInt
             }
         ];
         
@@ -352,7 +358,8 @@ class PixelMovementDemo {
             ['brightness-sensitivity', params.brightnessSensitivity],
             ['region-threshold', params.regionThreshold],
             ['gravity-strength', params.gravityStrength],
-            ['scatter-strength', params.scatterStrength]
+            ['scatter-strength', params.scatterStrength],
+            ['random-mirrors', params.randomMirrors]
         ];
         
         updates.forEach(([id, value]) => {
@@ -380,6 +387,11 @@ class PixelMovementDemo {
     visualizeGravityWells() {
         this.movementEngine.visualizeGravityWells();
         this.updateStatus('Showing gravity wells visualization.');
+    }
+
+    visualizeMirrorLines() {
+        this.movementEngine.visualizeMirrorLines();
+        this.updateStatus('Showing mirror lines visualization.');
     }
 
     visualizeDisplacement() {

@@ -16,6 +16,7 @@ class MovementEngine {
             regionThreshold: 30,
             gravityStrength: 0.0,
             scatterStrength: 0,
+            randomMirrors: 0,
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -31,6 +32,9 @@ class MovementEngine {
         // Gravity system
         this.gravityWells = [];
         this.gravityRadius = 80; // Pixels within this radius are affected
+        
+        // Mirror system
+        this.mirrorLines = [];
     }
 
     initialize(canvas) {
@@ -49,6 +53,7 @@ class MovementEngine {
         this.pixelManipulator.setRegions(this.regions);
         this.generateFlowField();
         this.generateGravityWells();
+        this.generateMirrorLines();
         
         return this.regions;
     }
@@ -65,6 +70,11 @@ class MovementEngine {
             // Trigger gravity wells regeneration for gravity changes
             if (name === 'gravityStrength') {
                 this.generateGravityWells();
+            }
+            
+            // Trigger mirror lines regeneration for mirror changes
+            if (name === 'randomMirrors') {
+                this.generateMirrorLines();
             }
             
             // Update image analysis for threshold changes
@@ -137,6 +147,130 @@ class MovementEngine {
                 strength: this.params.gravityStrength * (0.5 + Math.random() * 0.5) // Vary strength
             });
         }
+    }
+
+    generateMirrorLines() {
+        if (!this.pixelManipulator.width || !this.pixelManipulator.height || this.params.randomMirrors <= 0) {
+            this.mirrorLines = [];
+            return;
+        }
+        
+        this.mirrorLines = [];
+        const width = this.pixelManipulator.width;
+        const height = this.pixelManipulator.height;
+        
+        for (let i = 0; i < this.params.randomMirrors; i++) {
+            // Generate random mirror line from border to border
+            const angle = Math.random() * Math.PI; // 0 to 180 degrees
+            const startSide = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+            
+            let x1, y1, x2, y2;
+            
+            // Start point on a random border
+            switch (startSide) {
+                case 0: // Top border
+                    x1 = Math.random() * width;
+                    y1 = 0;
+                    break;
+                case 1: // Right border
+                    x1 = width;
+                    y1 = Math.random() * height;
+                    break;
+                case 2: // Bottom border
+                    x1 = Math.random() * width;
+                    y1 = height;
+                    break;
+                case 3: // Left border
+                    x1 = 0;
+                    y1 = Math.random() * height;
+                    break;
+            }
+            
+            // Calculate end point by extending line to opposite border
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            
+            // Find intersection with canvas boundaries
+            const tValues = [];
+            
+            // Check intersection with left border (x = 0)
+            if (dx !== 0) {
+                const t = -x1 / dx;
+                const y = y1 + t * dy;
+                if (t > 0 && y >= 0 && y <= height) {
+                    tValues.push({ t, x: 0, y });
+                }
+            }
+            
+            // Check intersection with right border (x = width)
+            if (dx !== 0) {
+                const t = (width - x1) / dx;
+                const y = y1 + t * dy;
+                if (t > 0 && y >= 0 && y <= height) {
+                    tValues.push({ t, x: width, y });
+                }
+            }
+            
+            // Check intersection with top border (y = 0)
+            if (dy !== 0) {
+                const t = -y1 / dy;
+                const x = x1 + t * dx;
+                if (t > 0 && x >= 0 && x <= width) {
+                    tValues.push({ t, x, y: 0 });
+                }
+            }
+            
+            // Check intersection with bottom border (y = height)
+            if (dy !== 0) {
+                const t = (height - y1) / dy;
+                const x = x1 + t * dx;
+                if (t > 0 && x >= 0 && x <= width) {
+                    tValues.push({ t, x, y: height });
+                }
+            }
+            
+            // Use the closest intersection point
+            if (tValues.length > 0) {
+                tValues.sort((a, b) => a.t - b.t);
+                x2 = tValues[0].x;
+                y2 = tValues[0].y;
+            } else {
+                // Fallback: create horizontal or vertical line
+                if (Math.random() < 0.5) {
+                    // Horizontal line
+                    x1 = 0;
+                    y1 = Math.random() * height;
+                    x2 = width;
+                    y2 = y1;
+                } else {
+                    // Vertical line
+                    x1 = Math.random() * width;
+                    y1 = 0;
+                    x2 = x1;
+                    y2 = height;
+                }
+            }
+            
+            // Calculate line normal vector for reflections
+            const lineVecX = x2 - x1;
+            const lineVecY = y2 - y1;
+            const lineLength = Math.sqrt(lineVecX * lineVecX + lineVecY * lineVecY);
+            
+            // Normal vector (perpendicular to the line)
+            const normalX = -lineVecY / lineLength;
+            const normalY = lineVecX / lineLength;
+            
+            this.mirrorLines.push({
+                x1, y1, x2, y2,
+                normalX, normalY,
+                // Line equation coefficients (ax + by + c = 0)
+                a: normalX,
+                b: normalY,
+                c: -(normalX * x1 + normalY * y1)
+            });
+        }
+        
+        console.log(`Generated ${this.mirrorLines.length} mirror lines for Random Mirrors = ${this.params.randomMirrors}`);
     }
 
     applyGravityForces() {
@@ -261,6 +395,92 @@ class MovementEngine {
         }
     }
 
+    applyMirrorReflections() {
+        if (this.params.randomMirrors <= 0 || this.mirrorLines.length === 0) return;
+        
+        const pixelPositions = this.pixelManipulator.pixelPositions;
+        const pixelVelocities = this.pixelManipulator.pixelVelocities;
+        const width = this.pixelManipulator.width;
+        const height = this.pixelManipulator.height;
+        
+        let reflectionsApplied = 0;
+        let debugCount = 0;
+        
+        // Sample fewer pixels for performance but ensure we check enough
+        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 10000)); // Check up to 10k pixels
+        
+        for (let i = 0; i < pixelPositions.length; i += sampleRate) {
+            const pixel = pixelPositions[i];
+            const velocity = pixelVelocities[i];
+            
+            // Skip pixels that are not moving much
+            const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+            if (speed < 0.5) continue;
+            
+            // Calculate where the pixel will be next frame
+            const nextX = pixel.x + velocity.x;
+            const nextY = pixel.y + velocity.y;
+            
+            for (let mirrorLine of this.mirrorLines) {
+                // Check if pixel crosses the mirror line using line equation
+                const currentDist = mirrorLine.a * pixel.x + mirrorLine.b * pixel.y + mirrorLine.c;
+                const nextDist = mirrorLine.a * nextX + mirrorLine.b * nextY + mirrorLine.c;
+                
+                // If signs are different, the pixel crossed the line
+                if (currentDist * nextDist < 0 && Math.abs(currentDist) < 50) { // Only if close to line
+                    // Calculate intersection point using parametric approach
+                    const denominator = currentDist - nextDist;
+                    if (Math.abs(denominator) < 0.001) continue; // Avoid division by zero
+                    
+                    const t = Math.abs(currentDist) / Math.abs(denominator);
+                    const intersectX = pixel.x + t * velocity.x;
+                    const intersectY = pixel.y + t * velocity.y;
+                    
+                    // Make sure intersection is within canvas bounds
+                    if (intersectX < 0 || intersectX >= width || intersectY < 0 || intersectY >= height) {
+                        continue;
+                    }
+                    
+                    // Reflect velocity across the mirror line
+                    // Formula: v_reflected = v - 2 * (v · n) * n
+                    const dotProduct = velocity.x * mirrorLine.normalX + velocity.y * mirrorLine.normalY;
+                    const reflectedVelX = velocity.x - 2 * dotProduct * mirrorLine.normalX;
+                    const reflectedVelY = velocity.y - 2 * dotProduct * mirrorLine.normalY;
+                    
+                    // Update velocity
+                    velocity.x = reflectedVelX;
+                    velocity.y = reflectedVelY;
+                    
+                    // Move pixel to intersection point plus a bit beyond to avoid re-crossing
+                    const reflectionOffset = 2.0;
+                    pixel.x = intersectX + mirrorLine.normalX * reflectionOffset;
+                    pixel.y = intersectY + mirrorLine.normalY * reflectionOffset;
+                    
+                    // Ensure pixel stays within canvas bounds
+                    pixel.x = Math.max(1, Math.min(width - 1, pixel.x));
+                    pixel.y = Math.max(1, Math.min(height - 1, pixel.y));
+                    
+                    reflectionsApplied++;
+                    
+                    // Debug first few reflections
+                    if (debugCount < 3) {
+                        console.log(`Mirror reflection ${reflectionsApplied}: pixel ${i} speed=${speed.toFixed(1)} reflected off line ${mirrorLine.x1.toFixed(0)},${mirrorLine.y1.toFixed(0)} to ${mirrorLine.x2.toFixed(0)},${mirrorLine.y2.toFixed(0)}`);
+                        console.log(`  Old velocity: (${(velocity.x - (reflectedVelX - velocity.x)).toFixed(2)}, ${(velocity.y - (reflectedVelY - velocity.y)).toFixed(2)}) -> New velocity: (${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)})`);
+                        debugCount++;
+                    }
+                    
+                    // Only reflect once per pixel per frame
+                    break;
+                }
+            }
+        }
+        
+        // Debug logging every 60 frames (more frequent)
+        if (this.frameCount % 60 === 0) {
+            console.log(`Mirror debug: ${this.mirrorLines.length} mirror lines, ${reflectionsApplied} reflections this frame, sampling every ${sampleRate} pixels`);
+        }
+    }
+
     startAnimation() {
         if (this.isRunning) return;
         
@@ -306,11 +526,19 @@ class MovementEngine {
             this.params.brightnessSensitivity
         );
         
-        // Apply scatter forces AFTER position update (so it doesn't get overridden)
+        // Apply mirror reflections BEFORE scatter (so scatter can also be reflected)
+        this.applyMirrorReflections();
+        
+        // Apply scatter forces AFTER position update and mirror reflections
         this.applyScatterForces();
         
         // Render frame
         const frameData = this.pixelManipulator.renderFrame();
+        
+        // Draw mirror lines on top if they exist (for debugging)
+        if (this.params.randomMirrors > 0) {
+            this.visualizeMirrorLines();
+        }
         
         // Record frame if needed
         if (this.isRecording) {
@@ -526,6 +754,38 @@ class MovementEngine {
             ctx.beginPath();
             ctx.arc(well.x, well.y, this.gravityRadius, 0, Math.PI * 2);
             ctx.stroke();
+        });
+        
+        ctx.restore();
+    }
+
+    visualizeMirrorLines() {
+        if (!this.mirrorLines.length) return;
+        
+        const ctx = this.ctx;
+        ctx.save();
+        
+        this.mirrorLines.forEach((mirror, index) => {
+            // Draw mirror line as a bright yellow line
+            ctx.strokeStyle = `rgba(255, 255, 0, 0.8)`; // Bright yellow
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(mirror.x1, mirror.y1);
+            ctx.lineTo(mirror.x2, mirror.y2);
+            ctx.stroke();
+            
+            // Draw small circle at start point
+            ctx.fillStyle = `rgba(255, 255, 0, 0.6)`;
+            ctx.beginPath();
+            ctx.arc(mirror.x1, mirror.y1, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw label
+            const midX = (mirror.x1 + mirror.x2) / 2;
+            const midY = (mirror.y1 + mirror.y2) / 2;
+            ctx.fillStyle = 'yellow';
+            ctx.font = '12px monospace';
+            ctx.fillText(`M${index + 1}`, midX + 5, midY - 5);
         });
         
         ctx.restore();
