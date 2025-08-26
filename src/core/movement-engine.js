@@ -19,6 +19,7 @@ class MovementEngine {
             randomMirrors: 0,
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
+            trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -44,6 +45,10 @@ class MovementEngine {
         // Kaleidoscope fractal system
         this.kaleidoscopeSegments = 6; // Number of symmetrical segments
         this.kaleidoscopeRotation = 0; // Current rotation angle
+        
+        // Trails system
+        this.trailPixels = new Set(); // Pixels selected for trailing
+        this.trailHistory = new Map(); // Stores trail positions for each pixel
     }
 
     initialize(canvas) {
@@ -690,6 +695,187 @@ class MovementEngine {
         }
     }
 
+    applyTrails() {
+        if (this.params.trails <= 0) {
+            // Clear trail data when disabled
+            this.trailPixels.clear();
+            this.trailHistory.clear();
+            return;
+        }
+        
+        const pixelPositions = this.pixelManipulator.pixelPositions;
+        const pixelVelocities = this.pixelManipulator.pixelVelocities;
+        
+        if (!pixelPositions || pixelPositions.length === 0) return;
+        
+        // Scale pixel count properly - remove hard cap for higher trail values
+        const trailPercentage = this.params.trails * 0.1; // 10% per level as originally intended
+        let targetTrailCount = Math.floor(pixelPositions.length * trailPercentage);
+        
+        // Only cap at lower trail values for performance
+        if (this.params.trails <= 5) {
+            targetTrailCount = Math.min(1000, targetTrailCount); // Cap at 1000 for levels 1-5
+        }
+        // No cap for levels 6-10 to allow full coverage
+        
+        // Update trail pixel selection VERY infrequently to allow very long trails
+        if (this.frameCount % 600 === 0) { // Every 600 frames (~20 seconds at 30fps)
+            this.updateTrailPixelSelection(targetTrailCount, pixelPositions.length);
+            this.cleanupTrailHistory(); // Clean up old trail data
+        }
+        
+        // Apply trail effects to selected pixels - SIMPLIFIED for performance
+        let trailsApplied = 0;
+        const maxTrailLength = 30 + (this.params.trails * 10); // MUCH longer trails: 30-130 segments
+        
+        for (let pixelIndex of this.trailPixels) {
+            if (pixelIndex >= pixelPositions.length) continue;
+            
+            const pixel = pixelPositions[pixelIndex];
+            
+            // Initialize trail history for new pixels
+            if (!this.trailHistory.has(pixelIndex)) {
+                this.trailHistory.set(pixelIndex, []);
+            }
+            
+            const trailData = this.trailHistory.get(pixelIndex);
+            
+            // ALWAYS add current position to trail history (no speed check here)
+            trailData.unshift({
+                x: pixel.x,
+                y: pixel.y
+            });
+            
+            // Keep only last few positions for performance
+            if (trailData.length > maxTrailLength) {
+                trailData.length = maxTrailLength;
+            }
+            
+            trailsApplied++;
+        }
+        
+        // Debug logging
+        if (this.frameCount % 120 === 0 && this.params.trails > 0) {
+            console.log(`Trails: ${this.params.trails * 10}% coverage, ${this.trailPixels.size} pixels trailing, max length: ${maxTrailLength}`);
+        }
+    }
+
+    updateTrailPixelSelection(targetCount, totalPixels) {
+        // Clear existing selection
+        this.trailPixels.clear();
+        
+        // Randomly select pixels for trailing
+        const selectedIndices = new Set();
+        while (selectedIndices.size < targetCount) {
+            const randomIndex = Math.floor(Math.random() * totalPixels);
+            selectedIndices.add(randomIndex);
+        }
+        
+        this.trailPixels = selectedIndices;
+    }
+
+    cleanupTrailHistory() {
+        // Remove trail data for pixels that are no longer selected
+        for (let pixelIndex of this.trailHistory.keys()) {
+            if (!this.trailPixels.has(pixelIndex)) {
+                this.trailHistory.delete(pixelIndex);
+            }
+        }
+    }
+
+    renderTrails() {
+        if (this.params.trails <= 0 || !this.ctx) return;
+        
+        // Save canvas state
+        this.ctx.save();
+        this.ctx.lineWidth = 2;
+        
+        let trailsDrawn = 0;
+        
+        for (let pixelIndex of this.trailPixels) {
+            if (!this.trailHistory.has(pixelIndex)) continue;
+            
+            const trailData = this.trailHistory.get(pixelIndex);
+            if (trailData.length < 2) continue;
+            
+            // Get the original pixel color
+            const pixelColor = this.getPixelColor(pixelIndex);
+            
+            // Draw trail segments with fading alpha
+            let validTrail = true;
+            for (let i = 1; i < trailData.length; i++) {
+                // Check for teleportation jumps
+                const distance = Math.sqrt(
+                    Math.pow(trailData[i].x - trailData[i-1].x, 2) + 
+                    Math.pow(trailData[i].y - trailData[i-1].y, 2)
+                );
+                
+                if (distance > 50) {
+                    validTrail = false;
+                    break; // Skip this entire trail
+                }
+                
+                // Calculate fade based on position in trail (newer = more opaque)
+                const fadeRatio = (trailData.length - i) / trailData.length; // 1.0 to 0.0
+                const alpha = fadeRatio * 0.8; // Max 80% opacity
+                
+                // Set color with fading alpha using original pixel color
+                this.ctx.strokeStyle = `rgba(${pixelColor.r}, ${pixelColor.g}, ${pixelColor.b}, ${alpha})`;
+                
+                // Draw this segment
+                this.ctx.beginPath();
+                this.ctx.moveTo(trailData[i-1].x, trailData[i-1].y);
+                this.ctx.lineTo(trailData[i].x, trailData[i].y);
+                this.ctx.stroke();
+            }
+            
+            if (!validTrail) continue;
+            
+            trailsDrawn++;
+            
+            // Dynamic limit based on trail setting
+            const maxTrailsToRender = this.params.trails <= 5 ? 200 : 1000; // Much higher limit for high trail values
+            if (trailsDrawn >= maxTrailsToRender) break;
+        }
+        
+        // Restore canvas state
+        this.ctx.restore();
+        
+        // Debug logging with more detail
+        if (this.frameCount % 60 === 0 && this.params.trails > 0) {
+            let shortTrails = 0;
+            let validTrails = 0;
+            for (let data of this.trailHistory.values()) {
+                if (data.length < 2) shortTrails++;
+                else validTrails++;
+            }
+            console.log(`TRAILS DEBUG: ${trailsDrawn} trails drawn, ${this.trailPixels.size} selected pixels, ${this.trailHistory.size} in history (${validTrails} valid, ${shortTrails} too short)`);
+        }
+    }
+
+    getPixelColor(pixelIndex) {
+        // Get original color from the pixel manipulator's data
+        if (this.pixelManipulator.originalData && this.pixelManipulator.width) {
+            // Convert pixel index to x,y coordinates
+            const y = Math.floor(pixelIndex / this.pixelManipulator.width);
+            const x = pixelIndex % this.pixelManipulator.width;
+            
+            // Convert to data array index (RGBA format)
+            const dataIndex = (y * this.pixelManipulator.width + x) * 4;
+            
+            if (dataIndex + 3 < this.pixelManipulator.originalData.length) {
+                return {
+                    r: this.pixelManipulator.originalData[dataIndex],
+                    g: this.pixelManipulator.originalData[dataIndex + 1],
+                    b: this.pixelManipulator.originalData[dataIndex + 2]
+                };
+            }
+        }
+        
+        // Default to white if we can't get the original color
+        return { r: 255, g: 255, b: 255 };
+    }
+
     startAnimation() {
         if (this.isRunning) return;
         
@@ -747,8 +933,14 @@ class MovementEngine {
         // Apply kaleidoscope fractal for mesmerizing symmetrical patterns
         this.applyKaleidoscopeFractal();
         
+        // Apply trails to create ghosting effects on moving pixels
+        this.applyTrails();
+        
         // Render frame
         const frameData = this.pixelManipulator.renderFrame();
+        
+        // Render trails on top of the main frame
+        this.renderTrails();
         
         // Draw mirror lines on top if they exist (for debugging)
         if (this.params.randomMirrors > 0) {

@@ -58,6 +58,9 @@ class PixelMovementDemo {
         // Initialize kaleidoscope control
         this.initializeKaleidoscopeControl();
         
+        // Initialize trails control
+        this.initializeTrailsControl();
+        
         // Update interface
         this.updateStatus('System initialized. Ready to load image...');
         this.updateStats();
@@ -189,6 +192,20 @@ class PixelMovementDemo {
                 display.textContent = value;
             });
             console.log('Kaleidoscope Fractal control initialized');
+        }
+    }
+
+    initializeTrailsControl() {
+        const slider = document.getElementById('trails');
+        const display = document.getElementById('trails-value');
+        
+        if (slider && display) {
+            slider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                this.movementEngine.setParameter('trails', value);
+                display.textContent = value;
+            });
+            console.log('Trails control initialized');
         }
     }
 
