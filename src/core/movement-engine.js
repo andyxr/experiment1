@@ -486,15 +486,8 @@ class MovementEngine {
     }
 
     applyScanLineInterference() {
-        if (this.params.scanLineInterference <= 0) {
-            // Debug: show when interference is disabled
-            if (this.frameCount % 120 === 0) {
-                console.log(`Scan Line Interference: DISABLED (strength=${this.params.scanLineInterference})`);
-            }
-            return;
-        }
+        if (this.params.scanLineInterference <= 0) return;
         
-        console.log(`Scan Line Interference: ACTIVE (strength=${this.params.scanLineInterference})`);
         
         const pixelPositions = this.pixelManipulator.pixelPositions;
         const pixelVelocities = this.pixelManipulator.pixelVelocities;

@@ -15,26 +15,45 @@ class PixelMovementDemo {
     }
 
     init() {
+        console.log('=== INIT METHOD CALLED ===');
+        console.log('Document ready state:', document.readyState);
+        
         // Wait for DOM to be ready
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.setupInterface());
+            console.log('Document still loading, adding event listener');
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('DOMContentLoaded event fired');
+                this.setupInterface();
+            });
         } else {
+            console.log('Document already ready, calling setupInterface directly');
             this.setupInterface();
         }
     }
 
     setupInterface() {
+        console.log('=== SETUP INTERFACE START ===');
+        
         // Get DOM elements
         this.canvas = document.getElementById('main-canvas');
         this.ctx = this.canvas.getContext('2d');
         this.statusElement = document.getElementById('status-text');
+        console.log('DOM elements retrieved');
         
         // Initialize engines
         this.movementEngine.initialize(this.canvas);
         this.videoExporter.initialize(this.canvas);
+        console.log('Engines initialized');
         
         // Set up event listeners
+        console.log('About to setup event listeners...');
         this.setupEventListeners();
+        console.log('Event listeners setup complete');
+        
+        // Direct initialization without setTimeout
+        console.log('About to initialize scan line control...');
+        this.initializeScanLineControl();
+        console.log('Scan line control initialization complete');
         
         // Update interface
         this.updateStatus('System initialized. Ready to load image...');
@@ -91,12 +110,6 @@ class PixelMovementDemo {
                 displayId: 'mirrors-value',
                 parameterName: 'randomMirrors',
                 parser: parseInt
-            },
-            {
-                sliderId: 'scan-line-interference',
-                displayId: 'interference-value',
-                parameterName: 'scanLineInterference',
-                parser: parseInt
             }
         ];
         
@@ -104,26 +117,14 @@ class PixelMovementDemo {
             const slider = document.getElementById(sliderId);
             const valueDisplay = document.getElementById(displayId);
             
-            console.log(`Setting up control: ${sliderId} -> ${displayId} (${parameterName})`);
-            console.log(`Slider found: ${!!slider}, Display found: ${!!valueDisplay}`);
-            
             if (slider) {
                 slider.addEventListener('input', (e) => {
                     const value = parser(e.target.value);
-                    console.log(`Slider ${sliderId}: raw=${e.target.value}, parsed=${value}, parameterName=${parameterName}`);
                     this.movementEngine.setParameter(parameterName, value);
                     if (valueDisplay) {
                         valueDisplay.textContent = value;
-                        console.log(`Updated display ${displayId} to: ${value}`);
                     }
-                    console.log(`Parameter ${parameterName} changed to: ${value}`);
                 });
-            } else {
-                console.error(`Slider not found: ${sliderId}`);
-            }
-            
-            if (!valueDisplay) {
-                console.error(`Value display not found: ${displayId}`);
             }
         });
         
@@ -136,6 +137,42 @@ class PixelMovementDemo {
         
         // Animation frame updates
         this.setupAnimationLoop();
+    }
+
+    initializeScanLineControl() {
+        try {
+            console.log('=== SCAN LINE CONTROL INIT START ===');
+            const slider = document.getElementById('scan-line-interference');
+            const display = document.getElementById('interference-value');
+            
+            console.log('Slider element:', slider);
+            console.log('Display element:', display);
+            
+            if (slider && display) {
+                console.log('Adding event listener...');
+                const handler = (e) => {
+                    console.log('=== SLIDER EVENT FIRED ===');
+                    const value = parseInt(e.target.value);
+                    console.log('New value:', value);
+                    this.movementEngine.setParameter('scanLineInterference', value);
+                    display.textContent = value;
+                    console.log('Display updated to:', display.textContent);
+                };
+                
+                slider.addEventListener('input', handler);
+                console.log('Event listener added successfully');
+                
+                // Test that we can update the display manually
+                display.textContent = '0';
+                console.log('Manual display update test successful');
+                
+            } else {
+                console.error('Elements not found - slider:', !!slider, 'display:', !!display);
+            }
+            console.log('=== SCAN LINE CONTROL INIT END ===');
+        } catch (error) {
+            console.error('Error in initializeScanLineControl:', error);
+        }
     }
 
     setupAnimationLoop() {
@@ -376,8 +413,7 @@ class PixelMovementDemo {
             ['region-threshold', params.regionThreshold],
             ['gravity-strength', params.gravityStrength],
             ['scatter-strength', params.scatterStrength],
-            ['random-mirrors', params.randomMirrors],
-            ['scan-line-interference', params.scanLineInterference]
+            ['random-mirrors', params.randomMirrors]
         ];
         
         const displayMap = {
@@ -387,8 +423,7 @@ class PixelMovementDemo {
             'region-threshold': 'threshold-value',
             'gravity-strength': 'gravity-value',
             'scatter-strength': 'scatter-value',
-            'random-mirrors': 'mirrors-value',
-            'scan-line-interference': 'interference-value'
+            'random-mirrors': 'mirrors-value'
         };
         
         updates.forEach(([id, value]) => {
