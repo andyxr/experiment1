@@ -55,6 +55,9 @@ class PixelMovementDemo {
         this.initializeScanLineControl();
         console.log('Scan line control initialization complete');
         
+        // Initialize kaleidoscope control
+        this.initializeKaleidoscopeControl();
+        
         // Update interface
         this.updateStatus('System initialized. Ready to load image...');
         this.updateStats();
@@ -172,6 +175,20 @@ class PixelMovementDemo {
             console.log('=== SCAN LINE CONTROL INIT END ===');
         } catch (error) {
             console.error('Error in initializeScanLineControl:', error);
+        }
+    }
+
+    initializeKaleidoscopeControl() {
+        const slider = document.getElementById('kaleidoscope-fractal');
+        const display = document.getElementById('kaleidoscope-value');
+        
+        if (slider && display) {
+            slider.addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                this.movementEngine.setParameter('kaleidoscopeFractal', value);
+                display.textContent = value;
+            });
+            console.log('Kaleidoscope Fractal control initialized');
         }
     }
 

@@ -18,6 +18,7 @@ class MovementEngine {
             scatterStrength: 0,
             randomMirrors: 0,
             scanLineInterference: 0, // 0-10 scale for interference strength
+            kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -39,6 +40,10 @@ class MovementEngine {
         
         // Scan line interference system
         this.scanLinePhase = 0; // For animating the interference pattern
+        
+        // Kaleidoscope fractal system
+        this.kaleidoscopeSegments = 6; // Number of symmetrical segments
+        this.kaleidoscopeRotation = 0; // Current rotation angle
     }
 
     initialize(canvas) {
@@ -560,6 +565,131 @@ class MovementEngine {
         }
     }
 
+    applyKaleidoscopeFractal() {
+        if (this.params.kaleidoscopeFractal <= 0) return;
+        
+        const pixelPositions = this.pixelManipulator.pixelPositions;
+        const pixelVelocities = this.pixelManipulator.pixelVelocities;
+        const width = this.pixelManipulator.width;
+        const height = this.pixelManipulator.height;
+        
+        if (!pixelPositions || !width || !height) return;
+        
+        // Calculate kaleidoscope parameters
+        const strength = this.params.kaleidoscopeFractal / 10; // 0-1 scale
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxRadius = Math.min(width, height) / 2;
+        
+        // Update rotation for dynamic effect - MUCH faster and more visible
+        this.kaleidoscopeRotation += 0.08 + (strength * 0.12); // 4x faster rotation
+        if (this.kaleidoscopeRotation > Math.PI * 2) {
+            this.kaleidoscopeRotation -= Math.PI * 2;
+        }
+        
+        // Determine number of segments based on strength
+        this.kaleidoscopeSegments = Math.max(3, Math.min(12, Math.floor(3 + strength * 9)));
+        const segmentAngle = (Math.PI * 2) / this.kaleidoscopeSegments;
+        
+        // Sample MORE pixels for much more visible effect
+        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 35000)); // Process up to 35k pixels
+        let fractalsApplied = 0;
+        
+        for (let i = 0; i < pixelPositions.length; i += sampleRate) {
+            const pixel = pixelPositions[i];
+            const velocity = pixelVelocities[i];
+            
+            // Convert to polar coordinates relative to center
+            const deltaX = pixel.x - centerX;
+            const deltaY = pixel.y - centerY;
+            const radius = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Skip pixels too far from center or at center
+            if (radius > maxRadius || radius < 5) continue;
+            
+            let angle = Math.atan2(deltaY, deltaX) + this.kaleidoscopeRotation;
+            
+            // Normalize angle to [0, 2π]
+            while (angle < 0) angle += Math.PI * 2;
+            while (angle >= Math.PI * 2) angle -= Math.PI * 2;
+            
+            // Find which kaleidoscope segment this pixel is in
+            const segmentIndex = Math.floor(angle / segmentAngle);
+            const angleInSegment = angle % segmentAngle;
+            
+            // Create kaleidoscope mirroring effect
+            let mirroredAngle = angleInSegment;
+            
+            // Apply different mirroring patterns based on segment
+            if (segmentIndex % 2 === 0) {
+                // Even segments: mirror around segment center
+                mirroredAngle = segmentAngle - angleInSegment;
+            }
+            
+            // Add fractal-like recursive reflections for higher strengths
+            if (this.params.kaleidoscopeFractal > 5) {
+                const subSegments = Math.floor(strength * 4) + 2;
+                const subSegmentAngle = segmentAngle / subSegments;
+                const subIndex = Math.floor(mirroredAngle / subSegmentAngle);
+                const angleInSubSegment = mirroredAngle % subSegmentAngle;
+                
+                if (subIndex % 2 === 0) {
+                    mirroredAngle = angleInSubSegment;
+                } else {
+                    mirroredAngle = subSegmentAngle - angleInSubSegment;
+                }
+            }
+            
+            // Calculate target position based on mirrored angle
+            const targetAngle = mirroredAngle + (segmentIndex * segmentAngle) - this.kaleidoscopeRotation;
+            const targetX = centerX + Math.cos(targetAngle) * radius;
+            const targetY = centerY + Math.sin(targetAngle) * radius;
+            
+            // Apply kaleidoscope force - pull pixels toward their mirrored positions - MUCH STRONGER!
+            const forceX = (targetX - pixel.x) * strength * 0.8; // 8x stronger force
+            const forceY = (targetY - pixel.y) * strength * 0.8;
+            
+            velocity.x += forceX;
+            velocity.y += forceY;
+            
+            // Add direct position displacement for immediate visible effect at ALL levels
+            if (this.params.kaleidoscopeFractal >= 3) {
+                const directStrength = strength * 0.3; // Direct position jump
+                pixel.x += forceX * directStrength;
+                pixel.y += forceY * directStrength;
+                
+                // Keep pixels within bounds
+                pixel.x = Math.max(0, Math.min(width - 1, pixel.x));
+                pixel.y = Math.max(0, Math.min(height - 1, pixel.y));
+            }
+            
+            // At higher strengths, add spiraling motion - MUCH MORE DRAMATIC
+            if (this.params.kaleidoscopeFractal > 5) { // Start spiraling earlier at level 6
+                const spiralStrength = (this.params.kaleidoscopeFractal - 5) / 5; // 0-1 for levels 6-10
+                const tangentialForce = spiralStrength * 8; // 4x stronger spiral
+                
+                velocity.x += -deltaY / radius * tangentialForce;
+                velocity.y += deltaX / radius * tangentialForce;
+            }
+            
+            // At high strength, add radial pulsing - MORE VISIBLE
+            if (this.params.kaleidoscopeFractal >= 8) { // Start pulsing earlier at level 8
+                const pulsePhase = this.frameCount * 0.1; // Faster pulse
+                const pulseStrength = Math.sin(pulsePhase + radius * 0.05) * 3; // MUCH stronger pulse
+                
+                velocity.x += (deltaX / radius) * pulseStrength;
+                velocity.y += (deltaY / radius) * pulseStrength;
+            }
+            
+            fractalsApplied++;
+        }
+        
+        // Debug logging
+        if (this.frameCount % 120 === 0) {
+            console.log(`Kaleidoscope Fractal: strength=${this.params.kaleidoscopeFractal}, segments=${this.kaleidoscopeSegments}, affected=${fractalsApplied} pixels, rotation=${(this.kaleidoscopeRotation * 180 / Math.PI).toFixed(1)}°`);
+        }
+    }
+
     startAnimation() {
         if (this.isRunning) return;
         
@@ -613,6 +743,9 @@ class MovementEngine {
         
         // Apply scan line interference for CRT-like distortion effects
         this.applyScanLineInterference();
+        
+        // Apply kaleidoscope fractal for mesmerizing symmetrical patterns
+        this.applyKaleidoscopeFractal();
         
         // Render frame
         const frameData = this.pixelManipulator.renderFrame();
