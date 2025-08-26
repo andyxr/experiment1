@@ -496,11 +496,11 @@ class MovementEngine {
         
         if (!pixelPositions || !width || !height) return;
         
-        // Calculate interference parameters based on strength (0-10)
+        // Calculate interference parameters based on strength (0-10) - MUCH more dramatic!
         const strength = this.params.scanLineInterference / 10; // Normalize to 0-1
-        const scanLineSpacing = Math.max(2, 20 - this.params.scanLineInterference * 1.5); // Closer lines at higher strength
-        const maxDisplacement = this.params.scanLineInterference * 3; // Max 30 pixel displacement at strength 10
-        const interferenceSpeed = 0.05 + (strength * 0.1); // Animation speed
+        const scanLineSpacing = Math.max(3, 25 - this.params.scanLineInterference * 2); // Closer lines at higher strength
+        const maxDisplacement = this.params.scanLineInterference * 8; // Max 80 pixel displacement at strength 10 (was 30)
+        const interferenceSpeed = 0.08 + (strength * 0.15); // Faster animation speed
         
         // Update scan line phase for animation
         this.scanLinePhase += interferenceSpeed;
@@ -508,8 +508,8 @@ class MovementEngine {
             this.scanLinePhase -= Math.PI * 2;
         }
         
-        // Sample pixels for performance
-        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 15000)); // Process up to 15k pixels
+        // Sample more pixels for more prominent effect
+        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 25000)); // Process up to 25k pixels (was 15k)
         let interferenceApplied = 0;
         
         for (let i = 0; i < pixelPositions.length; i += sampleRate) {
@@ -519,12 +519,13 @@ class MovementEngine {
             // Calculate which scan line this pixel is on
             const scanLineIndex = Math.floor(pixel.y / scanLineSpacing);
             
-            // Create interference pattern using multiple sine waves for complexity
+            // Create interference pattern using multiple sine waves for complexity - MORE DRAMATIC!
             const primaryWave = Math.sin((scanLineIndex * 0.3) + this.scanLinePhase);
-            const secondaryWave = Math.sin((scanLineIndex * 0.7) + (this.scanLinePhase * 1.5)) * 0.5;
-            const tertiaryWave = Math.sin((scanLineIndex * 1.2) + (this.scanLinePhase * 0.8)) * 0.25;
+            const secondaryWave = Math.sin((scanLineIndex * 0.7) + (this.scanLinePhase * 1.5)) * 0.7; // Increased from 0.5
+            const tertiaryWave = Math.sin((scanLineIndex * 1.2) + (this.scanLinePhase * 0.8)) * 0.4; // Increased from 0.25
+            const quaternaryWave = Math.sin((scanLineIndex * 0.15) + (this.scanLinePhase * 2.2)) * 0.3; // NEW layer
             
-            const combinedWave = primaryWave + secondaryWave + tertiaryWave;
+            const combinedWave = primaryWave + secondaryWave + tertiaryWave + quaternaryWave;
             
             // Create horizontal displacement based on interference pattern
             const horizontalDisplacement = combinedWave * maxDisplacement * strength;
@@ -532,18 +533,18 @@ class MovementEngine {
             // Create vertical "jitter" effect for more realistic interference
             const verticalJitter = (Math.sin(scanLineIndex * 2.1 + this.scanLinePhase * 2) * 0.5) * strength;
             
-            // Apply interference to velocity (for smooth movement)
-            const interferenceForceX = horizontalDisplacement * 0.1;
-            const interferenceForceY = verticalJitter * 0.05;
+            // Apply interference to velocity (for smooth movement) - MUCH stronger forces!
+            const interferenceForceX = horizontalDisplacement * 0.3; // Tripled from 0.1
+            const interferenceForceY = verticalJitter * 0.15; // Tripled from 0.05
             
             velocity.x += interferenceForceX;
             velocity.y += interferenceForceY;
             
-            // At higher strengths, also apply direct position displacement for immediate effect
-            if (this.params.scanLineInterference > 5) {
-                const directStrength = (this.params.scanLineInterference - 5) / 5; // 0-1 for levels 6-10
-                pixel.x += horizontalDisplacement * directStrength * 0.2;
-                pixel.y += verticalJitter * directStrength * 0.1;
+            // Direct position displacement kicks in earlier and stronger
+            if (this.params.scanLineInterference > 3) { // Now starts at level 4 instead of 6
+                const directStrength = (this.params.scanLineInterference - 3) / 7; // 0-1 for levels 4-10
+                pixel.x += horizontalDisplacement * directStrength * 0.5; // Doubled from 0.2
+                pixel.y += verticalJitter * directStrength * 0.25; // Doubled from 0.1
                 
                 // Keep pixels within bounds
                 pixel.x = Math.max(0, Math.min(width - 1, pixel.x));
