@@ -17,6 +17,7 @@ class MovementEngine {
             gravityStrength: 0.0,
             scatterStrength: 0,
             randomMirrors: 0,
+            scanLineInterference: 0, // 0-10 scale for interference strength
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -35,6 +36,9 @@ class MovementEngine {
         
         // Mirror system
         this.mirrorLines = [];
+        
+        // Scan line interference system
+        this.scanLinePhase = 0; // For animating the interference pattern
     }
 
     initialize(canvas) {
@@ -481,6 +485,87 @@ class MovementEngine {
         }
     }
 
+    applyScanLineInterference() {
+        if (this.params.scanLineInterference <= 0) {
+            // Debug: show when interference is disabled
+            if (this.frameCount % 120 === 0) {
+                console.log(`Scan Line Interference: DISABLED (strength=${this.params.scanLineInterference})`);
+            }
+            return;
+        }
+        
+        console.log(`Scan Line Interference: ACTIVE (strength=${this.params.scanLineInterference})`);
+        
+        const pixelPositions = this.pixelManipulator.pixelPositions;
+        const pixelVelocities = this.pixelManipulator.pixelVelocities;
+        const width = this.pixelManipulator.width;
+        const height = this.pixelManipulator.height;
+        
+        if (!pixelPositions || !width || !height) return;
+        
+        // Calculate interference parameters based on strength (0-10)
+        const strength = this.params.scanLineInterference / 10; // Normalize to 0-1
+        const scanLineSpacing = Math.max(2, 20 - this.params.scanLineInterference * 1.5); // Closer lines at higher strength
+        const maxDisplacement = this.params.scanLineInterference * 3; // Max 30 pixel displacement at strength 10
+        const interferenceSpeed = 0.05 + (strength * 0.1); // Animation speed
+        
+        // Update scan line phase for animation
+        this.scanLinePhase += interferenceSpeed;
+        if (this.scanLinePhase > Math.PI * 2) {
+            this.scanLinePhase -= Math.PI * 2;
+        }
+        
+        // Sample pixels for performance
+        const sampleRate = Math.max(1, Math.floor(pixelPositions.length / 15000)); // Process up to 15k pixels
+        let interferenceApplied = 0;
+        
+        for (let i = 0; i < pixelPositions.length; i += sampleRate) {
+            const pixel = pixelPositions[i];
+            const velocity = pixelVelocities[i];
+            
+            // Calculate which scan line this pixel is on
+            const scanLineIndex = Math.floor(pixel.y / scanLineSpacing);
+            
+            // Create interference pattern using multiple sine waves for complexity
+            const primaryWave = Math.sin((scanLineIndex * 0.3) + this.scanLinePhase);
+            const secondaryWave = Math.sin((scanLineIndex * 0.7) + (this.scanLinePhase * 1.5)) * 0.5;
+            const tertiaryWave = Math.sin((scanLineIndex * 1.2) + (this.scanLinePhase * 0.8)) * 0.25;
+            
+            const combinedWave = primaryWave + secondaryWave + tertiaryWave;
+            
+            // Create horizontal displacement based on interference pattern
+            const horizontalDisplacement = combinedWave * maxDisplacement * strength;
+            
+            // Create vertical "jitter" effect for more realistic interference
+            const verticalJitter = (Math.sin(scanLineIndex * 2.1 + this.scanLinePhase * 2) * 0.5) * strength;
+            
+            // Apply interference to velocity (for smooth movement)
+            const interferenceForceX = horizontalDisplacement * 0.1;
+            const interferenceForceY = verticalJitter * 0.05;
+            
+            velocity.x += interferenceForceX;
+            velocity.y += interferenceForceY;
+            
+            // At higher strengths, also apply direct position displacement for immediate effect
+            if (this.params.scanLineInterference > 5) {
+                const directStrength = (this.params.scanLineInterference - 5) / 5; // 0-1 for levels 6-10
+                pixel.x += horizontalDisplacement * directStrength * 0.2;
+                pixel.y += verticalJitter * directStrength * 0.1;
+                
+                // Keep pixels within bounds
+                pixel.x = Math.max(0, Math.min(width - 1, pixel.x));
+                pixel.y = Math.max(0, Math.min(height - 1, pixel.y));
+            }
+            
+            interferenceApplied++;
+        }
+        
+        // Debug logging every 120 frames
+        if (this.frameCount % 120 === 0 && this.params.scanLineInterference > 0) {
+            console.log(`Scan Line Interference: strength=${this.params.scanLineInterference}, spacing=${scanLineSpacing.toFixed(1)}, displacement=${maxDisplacement.toFixed(1)}, affected=${interferenceApplied} pixels`);
+        }
+    }
+
     startAnimation() {
         if (this.isRunning) return;
         
@@ -531,6 +616,9 @@ class MovementEngine {
         
         // Apply scatter forces AFTER position update and mirror reflections
         this.applyScatterForces();
+        
+        // Apply scan line interference for CRT-like distortion effects
+        this.applyScanLineInterference();
         
         // Render frame
         const frameData = this.pixelManipulator.renderFrame();
@@ -760,35 +848,8 @@ class MovementEngine {
     }
 
     visualizeMirrorLines() {
-        if (!this.mirrorLines.length) return;
-        
-        const ctx = this.ctx;
-        ctx.save();
-        
-        this.mirrorLines.forEach((mirror, index) => {
-            // Draw mirror line as a bright yellow line
-            ctx.strokeStyle = `rgba(255, 255, 0, 0.8)`; // Bright yellow
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(mirror.x1, mirror.y1);
-            ctx.lineTo(mirror.x2, mirror.y2);
-            ctx.stroke();
-            
-            // Draw small circle at start point
-            ctx.fillStyle = `rgba(255, 255, 0, 0.6)`;
-            ctx.beginPath();
-            ctx.arc(mirror.x1, mirror.y1, 3, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw label
-            const midX = (mirror.x1 + mirror.x2) / 2;
-            const midY = (mirror.y1 + mirror.y2) / 2;
-            ctx.fillStyle = 'yellow';
-            ctx.font = '12px monospace';
-            ctx.fillText(`M${index + 1}`, midX + 5, midY - 5);
-        });
-        
-        ctx.restore();
+        // Mirror lines are now invisible - no rendering
+        return;
     }
 
     getStats() {

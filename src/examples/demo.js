@@ -91,6 +91,12 @@ class PixelMovementDemo {
                 displayId: 'mirrors-value',
                 parameterName: 'randomMirrors',
                 parser: parseInt
+            },
+            {
+                sliderId: 'scan-line-interference',
+                displayId: 'interference-value',
+                parameterName: 'scanLineInterference',
+                parser: parseInt
             }
         ];
         
@@ -98,15 +104,26 @@ class PixelMovementDemo {
             const slider = document.getElementById(sliderId);
             const valueDisplay = document.getElementById(displayId);
             
+            console.log(`Setting up control: ${sliderId} -> ${displayId} (${parameterName})`);
+            console.log(`Slider found: ${!!slider}, Display found: ${!!valueDisplay}`);
+            
             if (slider) {
                 slider.addEventListener('input', (e) => {
                     const value = parser(e.target.value);
+                    console.log(`Slider ${sliderId}: raw=${e.target.value}, parsed=${value}, parameterName=${parameterName}`);
                     this.movementEngine.setParameter(parameterName, value);
                     if (valueDisplay) {
-                        valueDisplay.textContent = e.target.value;
+                        valueDisplay.textContent = value;
+                        console.log(`Updated display ${displayId} to: ${value}`);
                     }
                     console.log(`Parameter ${parameterName} changed to: ${value}`);
                 });
+            } else {
+                console.error(`Slider not found: ${sliderId}`);
+            }
+            
+            if (!valueDisplay) {
+                console.error(`Value display not found: ${displayId}`);
             }
         });
         
@@ -359,12 +376,24 @@ class PixelMovementDemo {
             ['region-threshold', params.regionThreshold],
             ['gravity-strength', params.gravityStrength],
             ['scatter-strength', params.scatterStrength],
-            ['random-mirrors', params.randomMirrors]
+            ['random-mirrors', params.randomMirrors],
+            ['scan-line-interference', params.scanLineInterference]
         ];
+        
+        const displayMap = {
+            'movement-speed': 'speed-value',
+            'noise-scale': 'noise-value',
+            'brightness-sensitivity': 'brightness-value',
+            'region-threshold': 'threshold-value',
+            'gravity-strength': 'gravity-value',
+            'scatter-strength': 'scatter-value',
+            'random-mirrors': 'mirrors-value',
+            'scan-line-interference': 'interference-value'
+        };
         
         updates.forEach(([id, value]) => {
             const slider = document.getElementById(id);
-            const display = document.getElementById(id + '-value');
+            const display = document.getElementById(displayMap[id]);
             
             if (slider) slider.value = value;
             if (display) display.textContent = value;
