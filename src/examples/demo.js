@@ -79,6 +79,12 @@ class PixelMovementDemo {
                 displayId: 'gravity-value',
                 parameterName: 'gravityStrength',
                 parser: parseFloat
+            },
+            {
+                sliderId: 'scatter-strength',
+                displayId: 'scatter-value',
+                parameterName: 'scatterStrength',
+                parser: parseInt
             }
         ];
         
@@ -345,7 +351,8 @@ class PixelMovementDemo {
             ['noise-scale', params.noiseScale],
             ['brightness-sensitivity', params.brightnessSensitivity],
             ['region-threshold', params.regionThreshold],
-            ['gravity-strength', params.gravityStrength]
+            ['gravity-strength', params.gravityStrength],
+            ['scatter-strength', params.scatterStrength]
         ];
         
         updates.forEach(([id, value]) => {

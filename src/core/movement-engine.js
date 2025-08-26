@@ -15,6 +15,7 @@ class MovementEngine {
             brightnessSensitivity: 1.0,
             regionThreshold: 30,
             gravityStrength: 0.0,
+            scatterStrength: 0,
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -194,6 +195,72 @@ class MovementEngine {
         }
     }
 
+    applyScatterForces() {
+        if (this.params.scatterStrength <= 0) return;
+        
+        // Apply scatter more frequently for better visual effect
+        if (this.frameCount % 3 !== 0) return; // Every 3rd frame for more dramatic effect
+        
+        const pixelPositions = this.pixelManipulator.pixelPositions;
+        const pixelVelocities = this.pixelManipulator.pixelVelocities;
+        
+        // Calculate how many pixels to scatter based on percentage  
+        const totalPixels = pixelPositions.length;
+        const scatterCount = Math.floor((this.params.scatterStrength / 100) * totalPixels / 3); // Divide by 3 since we apply every 3 frames
+        
+        console.log(`Scatter debug: totalPixels=${totalPixels}, scatterStrength=${this.params.scatterStrength}, scatterCount=${scatterCount}`);
+        
+        if (scatterCount === 0) {
+            console.log("Scatter count is 0 - no pixels will be scattered");
+            return;
+        }
+        
+        // Randomly select pixels to scatter - use Set to avoid duplicates
+        const scatteredPixels = new Set();
+        while (scatteredPixels.size < scatterCount) {
+            const randomIndex = Math.floor(Math.random() * totalPixels);
+            scatteredPixels.add(randomIndex);
+        }
+        
+        const scatteredArray = Array.from(scatteredPixels);
+        console.log(`Scattering ${scatteredArray.length} unique pixels: first few indices:`, scatteredArray.slice(0, 5));
+        
+        // Apply random velocities to scattered pixels
+        scatteredArray.forEach((pixelIndex, arrayIndex) => {
+            // Generate random direction
+            const angle = Math.random() * Math.PI * 2;
+            
+            // Make scatter MUCH more dramatic - use a fixed high speed
+            const scatterSpeed = 10 + (this.params.movementSpeed * 5); // Much faster!
+            
+            // Calculate scatter velocity components
+            const scatterVelX = Math.cos(angle) * scatterSpeed;
+            const scatterVelY = Math.sin(angle) * scatterSpeed;
+            
+            // Apply scatter velocity (overwrite existing velocity completely)
+            pixelVelocities[pixelIndex].x = scatterVelX;
+            pixelVelocities[pixelIndex].y = scatterVelY;
+            
+            // ALSO directly move the pixel position for immediate visible effect - MAKE IT BIG
+            const jumpDistance = 40 + (this.params.scatterStrength * 2); // Big but not overwhelming jumps
+            const oldX = pixelPositions[pixelIndex].x;
+            const oldY = pixelPositions[pixelIndex].y;
+            
+            pixelPositions[pixelIndex].x += Math.cos(angle) * jumpDistance;
+            pixelPositions[pixelIndex].y += Math.sin(angle) * jumpDistance;
+            
+            // Debug first few scattered pixels
+            if (arrayIndex < 5) {
+                console.log(`Pixel ${pixelIndex} scattered: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) -> (${pixelPositions[pixelIndex].x.toFixed(1)}, ${pixelPositions[pixelIndex].y.toFixed(1)}) jump=${jumpDistance.toFixed(1)}`);
+            }
+        });
+        
+        // Debug logging
+        if (this.frameCount % 120 === 0 && scatterCount > 0) {
+            console.log(`Scatter: ${scatterCount} pixels scattered (${this.params.scatterStrength}%), total affected per second: ~${scatterCount * 6}`);
+        }
+    }
+
     startAnimation() {
         if (this.isRunning) return;
         
@@ -229,7 +296,7 @@ class MovementEngine {
             this.generateGravityWells();
         }
         
-        // Apply gravity forces before updating positions
+        // Apply gravity forces first
         this.applyGravityForces();
         
         // Update pixel positions
@@ -238,6 +305,9 @@ class MovementEngine {
             this.params.movementSpeed,
             this.params.brightnessSensitivity
         );
+        
+        // Apply scatter forces AFTER position update (so it doesn't get overridden)
+        this.applyScatterForces();
         
         // Render frame
         const frameData = this.pixelManipulator.renderFrame();
