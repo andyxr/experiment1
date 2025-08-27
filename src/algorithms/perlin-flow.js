@@ -752,6 +752,68 @@ class PerlinFlow {
         return field;
     }
 
+    createRadialFlow(width, height, centerX, centerY, strength = 1.0, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance === 0) {
+                    field[index] = {x: 0, y: 0, magnitude: 0};
+                    continue;
+                }
+                
+                // Normalize direction vectors
+                const normalizedX = dx / distance;
+                const normalizedY = dy / distance;
+                
+                // Base radial force - scaled for better visibility at low strengths
+                let radialStrength = strength * 1.0; // Increased from 0.3 to 1.0 for better low-strength response
+                
+                // Add distance-based scaling for explosion effect
+                // Adjust falloff for better low-strength visibility
+                const distanceFalloff = Math.max(0.6, Math.exp(-distance * 0.002)); // Slightly stronger falloff
+                radialStrength *= distanceFalloff;
+                
+                // Apply strength scaling directly - no minimum needed since forces work fine at low values
+                radialStrength *= strength;
+                
+                const radialX = normalizedX * radialStrength;
+                const radialY = normalizedY * radialStrength;
+                
+                // Add minimal noise for organic variation
+                const noiseValue = this.noise3D(x * 0.02, y * 0.02, timeOffset * 0.3);
+                const noiseAngle = noiseValue * Math.PI * 0.05; // Very minimal noise influence
+                const noiseStrength = strength * 0.02; // Use direct strength scaling
+                const noiseX = Math.cos(noiseAngle) * noiseStrength;
+                const noiseY = Math.sin(noiseAngle) * noiseStrength;
+                
+                // Add very subtle pulsing effect based on time
+                const pulsePhase = timeOffset * 1.0 + distance * 0.02; // Even slower pulsing
+                const pulseFactor = 1.0 + Math.sin(pulsePhase) * 0.05 * strength; // Use direct strength
+                
+                // Combine forces
+                const finalX = (radialX + noiseX) * pulseFactor;
+                const finalY = (radialY + noiseY) * pulseFactor;
+                
+                
+                field[index] = {
+                    x: finalX,
+                    y: finalY,
+                    magnitude: Math.sqrt(finalX * finalX + finalY * finalY),
+                    radial: true,
+                    distance: distance
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         
