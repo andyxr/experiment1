@@ -814,6 +814,70 @@ class PerlinFlow {
         return field;
     }
 
+    createChromaticFlow(width, height, strength = 1.0, timeOffset = 0, scale = 0.01) {
+        const field = new Array(width * height);
+        
+        // Create EXTREMELY chaotic and different patterns
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // Distance and angle from center
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                
+                // Create 3 VERY different patterns that interfere with each other
+                
+                // Pattern 1: Spiraling waves
+                const spiral1 = Math.sin(distance * 0.3 + angle * 3 + timeOffset * 5);
+                const spiral2 = Math.cos(distance * 0.2 - angle * 2 + timeOffset * 3);
+                
+                // Pattern 2: Radial pulses
+                const pulse1 = Math.sin(distance * 0.1 + timeOffset * 8);
+                const pulse2 = Math.cos(distance * 0.15 - timeOffset * 6);
+                
+                // Pattern 3: Rotating interference
+                const rotation = timeOffset * 2;
+                const interference1 = Math.sin(x * 0.2 + y * 0.3 + rotation);
+                const interference2 = Math.cos(x * 0.15 - y * 0.25 - rotation);
+                
+                // Combine all patterns with VERY different weights - EXTREME SCALING BY STRENGTH
+                const baseStrength = Math.pow(strength, 3); // CUBIC scaling for maximum dramatic differences
+                const chaosX = (spiral1 * 0.4 + pulse1 * 0.3 + interference1 * 0.3) * baseStrength * 10.0; // Doubled multiplier
+                const chaosY = (spiral2 * 0.4 + pulse2 * 0.3 + interference2 * 0.3) * baseStrength * 10.0; // Doubled multiplier
+                
+                
+                // Add explosive radial component - also scaled by strength  
+                if (distance > 1) {
+                    const radialForce = Math.sin(timeOffset * 4 + distance * 0.1) * baseStrength * 4.0; // Doubled
+                    const radialX = (dx / distance) * radialForce;
+                    const radialY = (dy / distance) * radialForce;
+                    
+                    field[index] = {
+                        x: chaosX + radialX,
+                        y: chaosY + radialY,
+                        magnitude: Math.sqrt((chaosX + radialX) ** 2 + (chaosY + radialY) ** 2),
+                        chromatic: true
+                    };
+                } else {
+                    field[index] = {
+                        x: chaosX,
+                        y: chaosY,
+                        magnitude: Math.sqrt(chaosX ** 2 + chaosY ** 2),
+                        chromatic: true
+                    };
+                }
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

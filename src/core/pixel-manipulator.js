@@ -76,6 +76,14 @@ class PixelManipulator {
     setFlowField(flowField) {
         this.flowField = flowField;
     }
+    
+    resetVelocities() {
+        // Reset all pixel velocities to zero for immediate response to new forces
+        for (let i = 0; i < this.pixelVelocities.length; i++) {
+            this.pixelVelocities[i].x = 0;
+            this.pixelVelocities[i].y = 0;
+        }
+    }
 
     updatePixelPositions(deltaTime, movementSpeed = 1.0, brightnessSensitivity = 1.0) {
         this.time += deltaTime;
@@ -110,9 +118,14 @@ class PixelManipulator {
                 y: (Math.random() - 0.5) * 0.05
             };
             
-            // Combine forces
-            const totalForceX = flowVector.x * 0.1 + brightnessForce.x * 0.25 + regionForce.x * 0.1 + noiseForce.x * 0.05;
-            const totalForceY = flowVector.y * 0.1 + brightnessForce.y * 0.25 + regionForce.y * 0.1 + noiseForce.y * 0.05;
+            // Combine forces - special handling for chromatic flow
+            let flowWeight = 0.1;
+            if (this.flowField && this.flowField[0]?.chromatic) {
+                flowWeight = 0.8; // Much stronger weight for chromatic flow
+            }
+            
+            const totalForceX = flowVector.x * flowWeight + brightnessForce.x * 0.25 + regionForce.x * 0.1 + noiseForce.x * 0.05;
+            const totalForceY = flowVector.y * flowWeight + brightnessForce.y * 0.25 + regionForce.y * 0.1 + noiseForce.y * 0.05;
             
             // Update velocity with damping - PRESERVE existing velocity (includes gravity forces)
             const damping = 0.95;

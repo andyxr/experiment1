@@ -20,7 +20,7 @@ class MovementEngine {
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
-            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial'
+            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial', 'chromatic'
             flowStrength: 1.0,
             timeStep: 0.01,
             particleLifetime: 2000,
@@ -81,6 +81,11 @@ class MovementEngine {
             // Trigger flow field regeneration for relevant parameters
             if (['noiseScale', 'flowFieldType', 'flowStrength'].includes(name)) {
                 this.generateFlowField();
+                
+                // For chromatic flow, reset velocities to see immediate strength changes
+                if (this.params.flowFieldType === 'chromatic' && name === 'flowStrength') {
+                    this.pixelManipulator.resetVelocities();
+                }
             }
             
             // Trigger gravity wells regeneration for gravity changes
@@ -161,6 +166,11 @@ class MovementEngine {
             case 'radial':
                 flowField = this.perlinFlow.createRadialFlow(
                     width, height, width / 2, height / 2, this.params.flowStrength, time
+                );
+                break;
+            case 'chromatic':
+                flowField = this.perlinFlow.createChromaticFlow(
+                    width, height, this.params.flowStrength, time, scale
                 );
                 break;
             default: // 'perlin'
@@ -930,7 +940,7 @@ class MovementEngine {
         
         // Update flow field periodically - more frequently for dynamic types
         let updateInterval = 30; // Default: every 30 frames
-        if (this.params.flowFieldType === 'swarm' || this.params.flowFieldType === 'cellular' || this.params.flowFieldType === 'centrifugal') {
+        if (this.params.flowFieldType === 'swarm' || this.params.flowFieldType === 'cellular' || this.params.flowFieldType === 'centrifugal' || this.params.flowFieldType === 'chromatic') {
             updateInterval = 5; // Every 5 frames for dynamic behavior
         }
         
