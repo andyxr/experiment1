@@ -3,6 +3,16 @@ class PixelMovementDemo {
         this.movementEngine = new MovementEngine();
         this.videoExporter = new VideoExporter();
         
+        // Initialize Simple MP4 exporter if available
+        this.simpleMP4Exporter = null;
+        if (typeof SimpleMP4Exporter !== 'undefined') {
+            try {
+                this.simpleMP4Exporter = new SimpleMP4Exporter();
+            } catch (e) {
+                console.warn('Simple MP4 Exporter not available:', e.message);
+            }
+        }
+        
         this.canvas = null;
         this.ctx = null;
         this.currentImage = null;
@@ -43,6 +53,11 @@ class PixelMovementDemo {
         // Initialize engines
         this.movementEngine.initialize(this.canvas);
         this.videoExporter.initialize(this.canvas);
+        
+        // Initialize Simple MP4 exporter with canvas
+        if (this.simpleMP4Exporter) {
+            this.simpleMP4Exporter.initialize(this.canvas);
+        }
         console.log('Engines initialized');
         
         // Set up event listeners
@@ -363,11 +378,81 @@ class PixelMovementDemo {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
+        // Choose exporter: prefer Simple MP4 for MP4, fallback to MediaRecorder
+        const useSimpleMP4 = this.simpleMP4Exporter && this.simpleMP4Exporter.isWebCodecsSupported();
+        
+        if (useSimpleMP4) {
+            await this.exportVideoSimpleMP4();
+        } else {
+            await this.exportVideoMediaRecorder();
+        }
+    }
+
+    async exportVideoSimpleMP4() {
         try {
-            this.updateStatus('Starting video recording...');
+            this.updateStatus('Starting Simple MP4 recording...');
+            
+            // Check codec support
+            const codecSupport = await this.simpleMP4Exporter.checkCodecSupport();
+            if (!codecSupport.supported) {
+                throw new Error(`Codec not supported: ${codecSupport.reason}`);
+            }
+            
+            await this.simpleMP4Exporter.startRecording();
+            this.updateStatus(`Recording MP4 video with ${codecSupport.codec} codec... Stop animation to finish and download.`);
+            
+            // Set up frame recording callback
+            this.isSimpleMP4Recording = true;
+            this.movementEngine.setFrameRecordCallback(() => {
+                if (this.simpleMP4Exporter && this.simpleMP4Exporter.isRecording) {
+                    this.simpleMP4Exporter.recordFrame();
+                }
+            });
+            
+            // Automatically stop recording after animation stops
+            const checkStop = () => {
+                if (!this.movementEngine.isRunning && this.simpleMP4Exporter.isRecording) {
+                    this.finalizeSimpleMP4Export();
+                } else if (this.simpleMP4Exporter.isRecording) {
+                    setTimeout(checkStop, 100);
+                }
+            };
+            setTimeout(checkStop, 100);
+            
+        } catch (error) {
+            this.updateStatus(`Simple MP4 recording failed: ${error.message}. Falling back to MediaRecorder...`);
+            console.error(error);
+            // Fallback to MediaRecorder
+            await this.exportVideoMediaRecorder();
+        }
+    }
+
+    async finalizeSimpleMP4Export() {
+        try {
+            this.updateStatus('Finalizing MP4 video...');
+            
+            const videoData = await this.simpleMP4Exporter.stopRecording();
+            
+            if (videoData) {
+                this.simpleMP4Exporter.downloadVideo(videoData, 'pixel-movement-video');
+                this.updateStatus(`MP4 video exported successfully! ${videoData.frameCount} frames, ${videoData.duration.toFixed(2)}s`);
+            } else {
+                this.updateStatus('Failed to create MP4 video file.');
+            }
+        } catch (error) {
+            this.updateStatus(`MP4 export finalization failed: ${error.message}`);
+            console.error(error);
+        } finally {
+            this.isSimpleMP4Recording = false;
+            this.movementEngine.clearFrameRecordCallback();
+        }
+    }
+
+    async exportVideoMediaRecorder() {
+        try {
+            this.updateStatus('Starting MediaRecorder video recording...');
             
             await this.videoExporter.startRecording();
-            
             this.updateStatus('Recording video... Stop animation to finish and download.');
             
             // Automatically stop recording after animation stops
@@ -381,7 +466,7 @@ class PixelMovementDemo {
             setTimeout(checkStop, 100);
             
         } catch (error) {
-            this.updateStatus(`Export failed: ${error.message}`);
+            this.updateStatus(`Recording failed: ${error.message}`);
             console.error(error);
         }
     }

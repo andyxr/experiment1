@@ -31,6 +31,7 @@ class MovementEngine {
         this.frameCount = 0;
         this.exportFrames = [];
         this.isRecording = false;
+        this.frameRecordCallback = null; // Callback for WebCodecs frame recording
         
         // Gravity system
         this.gravityWells = [];
@@ -974,8 +975,21 @@ class MovementEngine {
             this.exportFrames.push(frameData);
         }
         
+        // Call WebCodecs frame recording callback if set
+        if (this.frameRecordCallback) {
+            this.frameRecordCallback();
+        }
+        
         this.frameCount++;
         this.animationId = requestAnimationFrame(() => this.animate());
+    }
+
+    setFrameRecordCallback(callback) {
+        this.frameRecordCallback = callback;
+    }
+
+    clearFrameRecordCallback() {
+        this.frameRecordCallback = null;
     }
 
     reset() {
@@ -984,6 +998,7 @@ class MovementEngine {
         this.frameCount = 0;
         this.exportFrames = [];
         this.isRecording = false;
+        this.frameRecordCallback = null;
         this.perlinFlow = new PerlinFlow(); // Reset time
     }
 
