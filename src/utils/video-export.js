@@ -12,8 +12,8 @@ class VideoExporter {
             height: 600,
             fps: 30,
             bitrate: 2500000, // 2.5 Mbps
-            format: 'webm', // or 'mp4'
-            codec: 'vp9' // or 'h264'
+            format: 'mp4', // or 'webm'
+            codec: 'h264' // or 'vp9'
         };
     }
 
@@ -95,32 +95,43 @@ class VideoExporter {
     }
 
     getMimeType() {
-        const codecMap = {
-            'webm': {
-                'vp9': 'video/webm;codecs=vp9',
-                'vp8': 'video/webm;codecs=vp8',
-                'h264': 'video/webm;codecs=h264'
-            },
-            'mp4': {
-                'h264': 'video/mp4;codecs=h264',
-                'vp9': 'video/mp4;codecs=vp9'
+        // Try MP4 formats first
+        const mp4Formats = [
+            'video/mp4;codecs=h264',
+            'video/mp4;codecs=avc1.42E01E',
+            'video/mp4'
+        ];
+
+        // If user wants MP4, try MP4 formats first
+        if (this.settings.format === 'mp4') {
+            for (const format of mp4Formats) {
+                if (MediaRecorder.isTypeSupported(format)) {
+                    return format;
+                }
             }
-        };
-
-        const mimeType = codecMap[this.settings.format]?.[this.settings.codec] || 'video/webm';
-        
-        // Check if the mime type is supported
-        if (MediaRecorder.isTypeSupported(mimeType)) {
-            return mimeType;
         }
 
-        // Fallback to basic webm
-        if (MediaRecorder.isTypeSupported('video/webm')) {
-            return 'video/webm';
+        // Try WebM formats
+        const webmFormats = [
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm'
+        ];
+
+        for (const format of webmFormats) {
+            if (MediaRecorder.isTypeSupported(format)) {
+                // Update settings to reflect actual format being used
+                if (this.settings.format === 'mp4' && format.includes('webm')) {
+                    console.warn('MP4 not supported, falling back to WebM');
+                    this.settings.format = 'webm';
+                }
+                return format;
+            }
         }
 
-        // Last resort fallback
-        return 'video/mp4';
+        // Final fallback
+        this.settings.format = 'webm';
+        return 'video/webm';
     }
 
     downloadVideo(videoData, filename = 'pixel-movement-video') {

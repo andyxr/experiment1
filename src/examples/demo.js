@@ -357,8 +357,10 @@ class PixelMovementDemo {
 
     async exportVideo() {
         if (!this.movementEngine.isRunning) {
-            this.updateStatus('Start animation before exporting.');
-            return;
+            this.updateStatus('Starting animation for video export...');
+            this.startAnimation();
+            // Wait a moment for animation to start
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
         
         try {
