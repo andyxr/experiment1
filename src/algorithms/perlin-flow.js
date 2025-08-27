@@ -557,6 +557,129 @@ class PerlinFlow {
         return field;
     }
 
+    createCellularFlow(width, height, cells = 8, strength = 1.0, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        // Initialize cell centers if not already done or if parameters changed
+        if (!this.cellularCenters || this.cellularCenters.length !== cells) {
+            this.cellularCenters = [];
+            for (let i = 0; i < cells; i++) {
+                this.cellularCenters.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: 8 + Math.random() * 12, // Slightly larger cells
+                    growthRate: 0.03 + Math.random() * 0.04, // Faster growth
+                    phase: Math.random() * Math.PI * 2, // Phase offset for pulsing
+                    divisionTimer: 50 + Math.random() * 150 // Much faster division (was 500)
+                });
+            }
+        }
+        
+        // Update cellular growth and division
+        const cellularCenters = this.cellularCenters;
+        const currentTime = timeOffset * 100; // Scale time for cellular processes
+        
+        for (let cell of cellularCenters) {
+            // Pulsing growth/shrink cycle
+            const pulseFactor = Math.sin(currentTime * cell.growthRate + cell.phase);
+            cell.currentRadius = cell.radius * (1 + pulseFactor * 0.3);
+            
+            // Simulate cell division (split into two cells occasionally)
+            cell.divisionTimer -= 1;
+            if (cell.divisionTimer <= 0 && cellularCenters.length < cells * 2.5) { // Allow more cells (2.5x instead of 1.5x)
+                // Create daughter cell nearby
+                const angle = Math.random() * Math.PI * 2;
+                const distance = cell.currentRadius * 1.5;
+                cellularCenters.push({
+                    x: cell.x + Math.cos(angle) * distance,
+                    y: cell.y + Math.sin(angle) * distance,
+                    radius: cell.radius * 0.8, // Slightly larger daughter cells
+                    growthRate: cell.growthRate + (Math.random() - 0.5) * 0.02, // More growth variation
+                    phase: Math.random() * Math.PI * 2,
+                    divisionTimer: 40 + Math.random() * 120 // Much faster division cycle
+                });
+                
+                // Reset parent cell
+                cell.radius *= 0.9; // Less shrinkage after division
+                cell.divisionTimer = 60 + Math.random() * 100; // Much faster next division
+                
+                // Keep cell positions within bounds
+                cellularCenters.forEach(c => {
+                    c.x = Math.max(c.currentRadius, Math.min(width - c.currentRadius, c.x));
+                    c.y = Math.max(c.currentRadius, Math.min(height - c.currentRadius, c.y));
+                });
+                
+                break; // Only one division per frame
+            }
+        }
+        
+        // Generate flow field based on cellular structure
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                let totalX = 0, totalY = 0, totalInfluence = 0;
+                
+                // Calculate influence from each cell
+                for (let cell of cellularCenters) {
+                    const dx = x - cell.x;
+                    const dy = y - cell.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Cell membrane effect - strongest flow at cell boundary
+                    const cellRadius = cell.currentRadius;
+                    let influence = 0;
+                    
+                    if (distance < cellRadius * 0.3) {
+                        // Inside cell core - gentle outward flow
+                        influence = strength * 0.3;
+                        const coreFlowX = (dx / (distance + 1)) * influence;
+                        const coreFlowY = (dy / (distance + 1)) * influence;
+                        totalX += coreFlowX;
+                        totalY += coreFlowY;
+                    } else if (distance < cellRadius) {
+                        // Near cell membrane - strong circular flow
+                        influence = strength * Math.exp(-(distance - cellRadius * 0.7) * 3);
+                        
+                        // Tangential flow around cell membrane
+                        const tangentX = -dy / (distance + 1);
+                        const tangentY = dx / (distance + 1);
+                        
+                        // Mix of outward and circular flow
+                        const radialX = dx / (distance + 1);
+                        const radialY = dy / (distance + 1);
+                        
+                        totalX += (tangentX * 0.7 + radialX * 0.3) * influence;
+                        totalY += (tangentY * 0.7 + radialY * 0.3) * influence;
+                    } else if (distance < cellRadius * 2) {
+                        // Outside cell - weak inward flow (nutrient absorption)
+                        influence = strength * 0.2 * Math.exp(-(distance - cellRadius) * 0.1);
+                        const inwardX = (-dx / (distance + 1)) * influence;
+                        const inwardY = (-dy / (distance + 1)) * influence;
+                        totalX += inwardX;
+                        totalY += inwardY;
+                    }
+                    
+                    totalInfluence += influence;
+                }
+                
+                // Add subtle noise for organic feel
+                const noiseValue = this.noise2D(x * 0.02, y * 0.02 + timeOffset * 0.1);
+                const noiseAngle = noiseValue * Math.PI;
+                totalX += Math.cos(noiseAngle) * 0.1 * strength;
+                totalY += Math.sin(noiseAngle) * 0.1 * strength;
+                
+                field[index] = {
+                    x: totalX,
+                    y: totalY,
+                    magnitude: Math.sqrt(totalX * totalX + totalY * totalY),
+                    cellular: totalInfluence
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

@@ -20,7 +20,7 @@ class MovementEngine {
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
-            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic'
+            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular'
             flowStrength: 1.0,
             timeStep: 0.01,
             particleLifetime: 2000,
@@ -145,6 +145,11 @@ class MovementEngine {
             case 'magnetic':
                 flowField = this.perlinFlow.createMagneticFlow(
                     width, height, 4, this.params.flowStrength, 'mixed'
+                );
+                break;
+            case 'cellular':
+                flowField = this.perlinFlow.createCellularFlow(
+                    width, height, 12, this.params.flowStrength, time  // More initial cells
                 );
                 break;
             default: // 'perlin'
@@ -912,8 +917,13 @@ class MovementEngine {
         const deltaTime = Math.min(currentTime - this.lastTime, 50); // Cap at 50ms
         this.lastTime = currentTime;
         
-        // Update flow field periodically
-        if (this.frameCount % 30 === 0) {
+        // Update flow field periodically - more frequently for dynamic types
+        let updateInterval = 30; // Default: every 30 frames
+        if (this.params.flowFieldType === 'swarm' || this.params.flowFieldType === 'cellular') {
+            updateInterval = 5; // Every 5 frames for dynamic behavior
+        }
+        
+        if (this.frameCount % updateInterval === 0) {
             this.perlinFlow.advanceTime(this.params.timeStep);
             this.generateFlowField();
         }
