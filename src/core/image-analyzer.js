@@ -77,7 +77,8 @@ class ImageAnalyzer {
                 b: data[index * 4 + 2]
             };
 
-            if (this.colorDistance(seedColor, pixelColor) > this.threshold) {
+            const distance = this.colorDistance(seedColor, pixelColor);
+            if (distance > this.threshold) {
                 continue;
             }
 
@@ -131,8 +132,8 @@ class ImageAnalyzer {
         // Sort regions by size (largest first)
         regions.sort((a, b) => b.size - a.size);
         
-        // Keep only significant regions and calculate movement properties
-        const significantRegions = regions.slice(0, Math.min(100, regions.length));
+        // Keep all regions and calculate movement properties
+        const significantRegions = regions;
         
         return significantRegions.map((region, index) => {
             const hue = this.rgbToHue(region.avgColor);
