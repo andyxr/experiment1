@@ -61,6 +61,9 @@ class PixelMovementDemo {
         // Initialize trails control
         this.initializeTrailsControl();
         
+        // Initialize flow field controls
+        this.initializeFlowFieldControls();
+        
         // Update interface
         this.updateStatus('System initialized. Ready to load image...');
         this.updateStats();
@@ -206,6 +209,32 @@ class PixelMovementDemo {
                 display.textContent = value;
             });
             console.log('Trails control initialized');
+        }
+    }
+
+    initializeFlowFieldControls() {
+        // Flow field type dropdown
+        const typeSelect = document.getElementById('flow-field-type');
+        if (typeSelect) {
+            typeSelect.addEventListener('change', (e) => {
+                const value = e.target.value;
+                this.movementEngine.setParameter('flowFieldType', value);
+                console.log('Flow field type changed to:', value);
+            });
+            console.log('Flow field type control initialized');
+        }
+
+        // Flow strength slider
+        const strengthSlider = document.getElementById('flow-strength');
+        const strengthDisplay = document.getElementById('flow-strength-value');
+        
+        if (strengthSlider && strengthDisplay) {
+            strengthSlider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.movementEngine.setParameter('flowStrength', value);
+                strengthDisplay.textContent = value;
+            });
+            console.log('Flow strength control initialized');
         }
     }
 
@@ -459,6 +488,15 @@ class PixelMovementDemo {
             'scatter-strength': 'scatter-value',
             'random-mirrors': 'mirrors-value'
         };
+
+        // Also update flow field controls
+        const flowTypeSelect = document.getElementById('flow-field-type');
+        const flowStrengthSlider = document.getElementById('flow-strength');
+        const flowStrengthDisplay = document.getElementById('flow-strength-value');
+        
+        if (flowTypeSelect) flowTypeSelect.value = params.flowFieldType;
+        if (flowStrengthSlider) flowStrengthSlider.value = params.flowStrength;
+        if (flowStrengthDisplay) flowStrengthDisplay.textContent = params.flowStrength;
         
         updates.forEach(([id, value]) => {
             const slider = document.getElementById(id);
