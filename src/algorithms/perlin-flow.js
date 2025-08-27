@@ -261,6 +261,277 @@ class PerlinFlow {
         return field;
     }
 
+    createSwarmFlow(width, height, boids = 8, strength = 1.0, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        // Initialize boids if not already done or if parameters changed
+        if (!this.swarmBoids || this.swarmBoids.length !== boids) {
+            this.swarmBoids = [];
+            for (let i = 0; i < boids; i++) {
+                this.swarmBoids.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    speed: 0.5 + Math.random() * 0.5
+                });
+            }
+        }
+        
+        // Update boid positions with flocking behavior
+        const swarmBoids = this.swarmBoids;
+        const separationRadius = Math.min(width, height) * 0.1;
+        const alignmentRadius = Math.min(width, height) * 0.15;
+        const cohesionRadius = Math.min(width, height) * 0.2;
+        
+        // Calculate flocking forces for each boid
+        for (let i = 0; i < swarmBoids.length; i++) {
+            const boid = swarmBoids[i];
+            let separationX = 0, separationY = 0;
+            let alignmentX = 0, alignmentY = 0;
+            let cohesionX = 0, cohesionY = 0;
+            let separationCount = 0, alignmentCount = 0, cohesionCount = 0;
+            
+            // Check interactions with other boids
+            for (let j = 0; j < swarmBoids.length; j++) {
+                if (i === j) continue;
+                
+                const other = swarmBoids[j];
+                const dx = boid.x - other.x;
+                const dy = boid.y - other.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Separation (avoid crowding)
+                if (distance < separationRadius && distance > 0) {
+                    separationX += dx / distance;
+                    separationY += dy / distance;
+                    separationCount++;
+                }
+                
+                // Alignment (steer towards average heading)
+                if (distance < alignmentRadius) {
+                    alignmentX += other.vx;
+                    alignmentY += other.vy;
+                    alignmentCount++;
+                }
+                
+                // Cohesion (steer towards average position)
+                if (distance < cohesionRadius) {
+                    cohesionX += other.x;
+                    cohesionY += other.y;
+                    cohesionCount++;
+                }
+            }
+            
+            // Apply flocking forces
+            if (separationCount > 0) {
+                separationX /= separationCount;
+                separationY /= separationCount;
+            }
+            
+            if (alignmentCount > 0) {
+                alignmentX /= alignmentCount;
+                alignmentY /= alignmentCount;
+            }
+            
+            if (cohesionCount > 0) {
+                cohesionX = (cohesionX / cohesionCount) - boid.x;
+                cohesionY = (cohesionY / cohesionCount) - boid.y;
+            }
+            
+            // Update velocity with flocking behavior - stronger forces
+            boid.vx += separationX * 0.1 + alignmentX * 0.05 + cohesionX * 0.02;
+            boid.vy += separationY * 0.1 + alignmentY * 0.05 + cohesionY * 0.02;
+            
+            // Limit speed - allow faster movement
+            const maxSpeed = boid.speed * 2;
+            const speed = Math.sqrt(boid.vx * boid.vx + boid.vy * boid.vy);
+            if (speed > maxSpeed) {
+                boid.vx = (boid.vx / speed) * maxSpeed;
+                boid.vy = (boid.vy / speed) * maxSpeed;
+            }
+            
+            // Update position
+            boid.x += boid.vx;
+            boid.y += boid.vy;
+            
+            // Wrap around edges
+            boid.x = (boid.x + width) % width;
+            boid.y = (boid.y + height) % height;
+        }
+        
+        // Generate flow field based on boid influences
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                let totalX = 0, totalY = 0, totalInfluence = 0;
+                
+                // Calculate influence from each boid
+                for (let boid of swarmBoids) {
+                    const dx = x - boid.x;
+                    const dy = y - boid.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    // Much larger influence radius and stronger effect
+                    const influence = Math.exp(-distance * 0.005) * strength * 3;
+                    
+                    if (influence > 0.01) {
+                        // Boid creates flow in its direction of movement - amplify velocity
+                        totalX += boid.vx * influence * 5;
+                        totalY += boid.vy * influence * 5;
+                        totalInfluence += influence;
+                    }
+                }
+                
+                // Normalize and add some noise for organic feel
+                if (totalInfluence > 0) {
+                    totalX /= totalInfluence;
+                    totalY /= totalInfluence;
+                }
+                
+                // Add subtle noise
+                const noiseValue = this.noise2D(x * 0.01, y * 0.01 + timeOffset * 0.1);
+                const noiseAngle = noiseValue * Math.PI * 0.5;
+                totalX += Math.cos(noiseAngle) * 0.1;
+                totalY += Math.sin(noiseAngle) * 0.1;
+                
+                field[index] = {
+                    x: totalX,
+                    y: totalY,
+                    magnitude: Math.sqrt(totalX * totalX + totalY * totalY),
+                    swarm: totalInfluence
+                };
+            }
+        }
+        
+        return field;
+    }
+
+    createMagneticFlow(width, height, poles = 4, strength = 1.0, polarity = 'mixed') {
+        const field = new Array(width * height);
+        
+        // Generate magnetic poles
+        const magneticPoles = [];
+        for (let i = 0; i < poles; i++) {
+            let charge;
+            switch (polarity) {
+                case 'all_positive':
+                    charge = 1;
+                    break;
+                case 'all_negative':
+                    charge = -1;
+                    break;
+                case 'mixed':
+                default:
+                    charge = i % 2 === 0 ? 1 : -1; // Alternate positive/negative
+                    break;
+            }
+            
+            magneticPoles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                charge: charge,
+                strength: strength * (0.8 + Math.random() * 0.4) // Vary individual pole strength
+            });
+        }
+        
+        // Generate magnetic field
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                let totalX = 0, totalY = 0;
+                
+                // Calculate field contribution from each pole
+                for (let pole of magneticPoles) {
+                    const dx = x - pole.x;
+                    const dy = y - pole.y;
+                    const distanceSquared = dx * dx + dy * dy;
+                    const distance = Math.sqrt(distanceSquared);
+                    
+                    // Avoid division by zero at pole centers
+                    if (distance < 2) continue;
+                    
+                    // Magnetic field strength falls off with distance squared - much stronger
+                    const fieldStrength = (pole.charge * pole.strength * 100) / Math.max(distanceSquared, 4);
+                    
+                    // Field lines point away from positive charges, toward negative charges
+                    const fieldX = (dx / distance) * fieldStrength;
+                    const fieldY = (dy / distance) * fieldStrength;
+                    
+                    totalX += fieldX;
+                    totalY += fieldY;
+                }
+                
+                // For dipole-like effects, create field lines that curve between opposite charges
+                if (poles >= 2 && polarity === 'mixed') {
+                    // Find closest positive and negative poles
+                    let closestPositive = null, closestNegative = null;
+                    let minPosDistance = Infinity, minNegDistance = Infinity;
+                    
+                    for (let pole of magneticPoles) {
+                        const dx = x - pole.x;
+                        const dy = y - pole.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (pole.charge > 0 && distance < minPosDistance) {
+                            closestPositive = pole;
+                            minPosDistance = distance;
+                        } else if (pole.charge < 0 && distance < minNegDistance) {
+                            closestNegative = pole;
+                            minNegDistance = distance;
+                        }
+                    }
+                    
+                    // Add dipole field lines
+                    if (closestPositive && closestNegative) {
+                        const dipoleX = closestNegative.x - closestPositive.x;
+                        const dipoleY = closestNegative.y - closestPositive.y;
+                        const dipoleDistance = Math.sqrt(dipoleX * dipoleX + dipoleY * dipoleY);
+                        
+                        if (dipoleDistance > 0) {
+                            // Create curved field lines
+                            const posX = x - closestPositive.x;
+                            const posY = y - closestPositive.y;
+                            const negX = x - closestNegative.x;
+                            const negY = y - closestNegative.y;
+                            
+                            const posDistance = Math.sqrt(posX * posX + posY * posY);
+                            const negDistance = Math.sqrt(negX * negX + negY * negY);
+                            
+                            // Blend field based on relative distances
+                            const blendFactor = posDistance / (posDistance + negDistance);
+                            const curveStrength = 2.0 * strength; // Much stronger curves
+                            
+                            // Perpendicular component for curved field lines
+                            const perpX = -dipoleY / dipoleDistance;
+                            const perpY = dipoleX / dipoleDistance;
+                            
+                            const curveX = perpX * curveStrength * Math.sin(blendFactor * Math.PI);
+                            const curveY = perpY * curveStrength * Math.sin(blendFactor * Math.PI);
+                            
+                            totalX += curveX;
+                            totalY += curveY;
+                        }
+                    }
+                }
+                
+                // Add subtle noise for more organic field lines
+                const noiseValue = this.noise2D(x * 0.005, y * 0.005);
+                const noiseAngle = noiseValue * Math.PI * 0.2;
+                totalX += Math.cos(noiseAngle) * 0.2 * strength;
+                totalY += Math.sin(noiseAngle) * 0.2 * strength;
+                
+                field[index] = {
+                    x: totalX,
+                    y: totalY,
+                    magnitude: Math.sqrt(totalX * totalX + totalY * totalY),
+                    magnetic: true
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

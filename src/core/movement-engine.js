@@ -20,7 +20,7 @@ class MovementEngine {
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
-            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave'
+            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic'
             flowStrength: 1.0,
             timeStep: 0.01,
             particleLifetime: 2000,
@@ -135,6 +135,16 @@ class MovementEngine {
             case 'wave':
                 flowField = this.perlinFlow.createWaveFlow(
                     width, height, 50, this.params.flowStrength, time * 10
+                );
+                break;
+            case 'swarm':
+                flowField = this.perlinFlow.createSwarmFlow(
+                    width, height, 8, this.params.flowStrength, time
+                );
+                break;
+            case 'magnetic':
+                flowField = this.perlinFlow.createMagneticFlow(
+                    width, height, 4, this.params.flowStrength, 'mixed'
                 );
                 break;
             default: // 'perlin'

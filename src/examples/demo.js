@@ -219,7 +219,6 @@ class PixelMovementDemo {
             typeSelect.addEventListener('change', (e) => {
                 const value = e.target.value;
                 this.movementEngine.setParameter('flowFieldType', value);
-                console.log('Flow field type changed to:', value);
             });
             console.log('Flow field type control initialized');
         }

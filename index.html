@@ -92,6 +92,18 @@
             transition: all 0.3s;
         }
         
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+        }
+        
+        .control-buttons button {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        
         button:hover {
             background: #0f0;
             color: #000;
@@ -152,6 +164,12 @@
                     <div>Canvas: <span id="canvas-size">800x600</span></div>
                     <div>Regions: <span id="region-count">0</span></div>
                     <div>Displaced Pixels: <span id="particle-count">0</span></div>
+                </div>
+                
+                <div class="control-buttons">
+                    <button id="start-animation-btn" disabled>Start Animation</button>
+                    <button id="stop-animation-btn" disabled>Stop Animation</button>
+                    <button id="reset-btn">Reset</button>
                 </div>
             </div>
             
@@ -219,6 +237,8 @@
                         <option value="directional">Directional (Uniform)</option>
                         <option value="vortex">Vortex (Spiral)</option>
                         <option value="wave">Wave (Sinusoidal)</option>
+                        <option value="swarm">Swarm (Flocking)</option>
+                        <option value="magnetic">Magnetic (Field Lines)</option>
                     </select>
                 </div>
                 
@@ -228,9 +248,6 @@
                 </div>
                 
                 <button id="analyze-btn">Analyze Image</button>
-                <button id="start-animation-btn" disabled>Start Animation</button>
-                <button id="stop-animation-btn" disabled>Stop Animation</button>
-                <button id="reset-btn">Reset</button>
                 <button id="export-btn" disabled>Export Video</button>
             </div>
         </div>
