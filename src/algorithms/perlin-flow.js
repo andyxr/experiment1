@@ -680,6 +680,78 @@ class PerlinFlow {
         return field;
     }
 
+    createCentrifugalFlow(width, height, centerX, centerY, strength = 1.0, rotationSpeed = 0.02, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        // Calculate dynamic rotation angle based on time
+        const rotationAngle = timeOffset * rotationSpeed;
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                const dx = x - centerX;
+                const dy = y - centerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance === 0) {
+                    field[index] = {x: 0, y: 0, magnitude: 0};
+                    continue;
+                }
+                
+                // Normalize distance vectors
+                const normalizedX = dx / distance;
+                const normalizedY = dy / distance;
+                
+                // Calculate base rotational velocity (tangent to radius)
+                // Rotate by 90 degrees for tangential flow
+                const tangentX = -normalizedY;
+                const tangentY = normalizedX;
+                
+                // Apply rotation based on time (makes the whole field rotate)
+                const cosRot = Math.cos(rotationAngle);
+                const sinRot = Math.sin(rotationAngle);
+                const rotatedTangentX = tangentX * cosRot - tangentY * sinRot;
+                const rotatedTangentY = tangentX * sinRot + tangentY * cosRot;
+                
+                // Centrifugal force: outward radial acceleration (increases with distance) - PROPERLY SCALED BY STRENGTH
+                const centrifugalStrength = strength * Math.min(distance * 0.3 * strength, 8.0 * strength); // Scale cap by strength too
+                const centrifugalX = normalizedX * centrifugalStrength;
+                const centrifugalY = normalizedY * centrifugalStrength;
+                
+                // Rotational force: decreases with distance (like a spinning disc) - PROPERLY SCALED BY STRENGTH
+                const rotationalStrength = strength * Math.exp(-distance * 0.003) * 3.0 * strength; // Scale by strength squared for more effect
+                const rotationalX = rotatedTangentX * rotationalStrength;
+                const rotationalY = rotatedTangentY * rotationalStrength;
+                
+                // Combine centrifugal and rotational forces
+                let combinedX = centrifugalX + rotationalX;
+                let combinedY = centrifugalY + rotationalY;
+                
+                // Add subtle noise for organic variation - REDUCED so it doesn't mask centrifugal effect
+                const noiseValue = this.noise3D(x * 0.01, y * 0.01, timeOffset * 0.5);
+                const noiseAngle = noiseValue * Math.PI * 0.1;  // Reduced from 0.3
+                const noiseStrength = strength * 0.05;  // Reduced from 0.2
+                combinedX += Math.cos(noiseAngle) * noiseStrength;
+                combinedY += Math.sin(noiseAngle) * noiseStrength;
+                
+                // Add spiral effect for more dynamic motion - PROPERLY SCALED BY STRENGTH
+                const spiralFactor = Math.sin(distance * 0.1 + timeOffset * 2) * 1.0 * strength;  // Scale by strength
+                combinedX += rotatedTangentX * spiralFactor;
+                combinedY += rotatedTangentY * spiralFactor;
+                
+                field[index] = {
+                    x: combinedX,
+                    y: combinedY,
+                    magnitude: Math.sqrt(combinedX * combinedX + combinedY * combinedY),
+                    centrifugal: true,
+                    distance: distance
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

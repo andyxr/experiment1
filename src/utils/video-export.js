@@ -11,7 +11,7 @@ class VideoExporter {
             width: 800,
             height: 600,
             fps: 30,
-            bitrate: 2500000, // 2.5 Mbps
+            bitrate: 10000000, // 10 Mbps
             format: 'mp4', // or 'webm'
             codec: 'h264' // or 'vp9'
         };

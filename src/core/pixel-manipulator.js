@@ -90,6 +90,7 @@ class PixelManipulator {
             let flowVector = {x: 0, y: 0};
             if (this.flowField) {
                 flowVector = this.sampleFlowField(pos.x, pos.y);
+                
             }
             
             // Get pixel color/brightness for force calculations
@@ -110,8 +111,8 @@ class PixelManipulator {
             };
             
             // Combine forces
-            const totalForceX = flowVector.x * 0.6 + brightnessForce.x * 0.25 + regionForce.x * 0.1 + noiseForce.x * 0.05;
-            const totalForceY = flowVector.y * 0.6 + brightnessForce.y * 0.25 + regionForce.y * 0.1 + noiseForce.y * 0.05;
+            const totalForceX = flowVector.x * 0.1 + brightnessForce.x * 0.25 + regionForce.x * 0.1 + noiseForce.x * 0.05;
+            const totalForceY = flowVector.y * 0.1 + brightnessForce.y * 0.25 + regionForce.y * 0.1 + noiseForce.y * 0.05;
             
             // Update velocity with damping - PRESERVE existing velocity (includes gravity forces)
             const damping = 0.95;
@@ -184,13 +185,19 @@ class PixelManipulator {
     sampleFlowField(x, y) {
         if (!this.flowField) return {x: 0, y: 0};
         
-        const fieldWidth = Math.sqrt(this.flowField.length * this.width / this.height);
-        const fieldHeight = this.flowField.length / fieldWidth;
+        // Flow field is at 1/4 resolution (as per movement-engine.js line 115-116)
+        const fieldWidth = Math.floor(this.width / 4);
+        const fieldHeight = Math.floor(this.height / 4);
         
-        const fx = (x / this.width) * fieldWidth;
-        const fy = (y / this.height) * fieldHeight;
+        // Map pixel coordinates to flow field coordinates
+        const fx = Math.floor((x / this.width) * fieldWidth);
+        const fy = Math.floor((y / this.height) * fieldHeight);
         
-        const index = Math.floor(fy) * Math.floor(fieldWidth) + Math.floor(fx);
+        // Clamp to valid range
+        const clampedFx = Math.max(0, Math.min(fieldWidth - 1, fx));
+        const clampedFy = Math.max(0, Math.min(fieldHeight - 1, fy));
+        
+        const index = clampedFy * fieldWidth + clampedFx;
         
         if (index >= 0 && index < this.flowField.length) {
             return this.flowField[index];
