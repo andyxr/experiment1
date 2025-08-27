@@ -139,7 +139,7 @@ class MovementEngine {
                 break;
             case 'swarm':
                 flowField = this.perlinFlow.createSwarmFlow(
-                    width, height, 8, this.params.flowStrength, time
+                    width, height, 12, this.params.flowStrength, time  // More boids for varied patterns
                 );
                 break;
             case 'magnetic':

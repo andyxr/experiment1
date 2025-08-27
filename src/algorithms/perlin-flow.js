@@ -268,21 +268,26 @@ class PerlinFlow {
         if (!this.swarmBoids || this.swarmBoids.length !== boids) {
             this.swarmBoids = [];
             for (let i = 0; i < boids; i++) {
+                // Create more varied initial conditions
+                const angle = (Math.random() * Math.PI * 2);
+                const speed = 0.3 + Math.random() * 0.7; // More varied speeds
+                
                 this.swarmBoids.push({
                     x: Math.random() * width,
                     y: Math.random() * height,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: (Math.random() - 0.5) * 2,
-                    speed: 0.5 + Math.random() * 0.5
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    speed: speed,
+                    individualBehavior: Math.random() * 0.5 // Add individual variation
                 });
             }
         }
         
         // Update boid positions with flocking behavior
         const swarmBoids = this.swarmBoids;
-        const separationRadius = Math.min(width, height) * 0.1;
-        const alignmentRadius = Math.min(width, height) * 0.15;
-        const cohesionRadius = Math.min(width, height) * 0.2;
+        const separationRadius = Math.min(width, height) * 0.05; // Smaller radius for more varied behavior
+        const alignmentRadius = Math.min(width, height) * 0.08;
+        const cohesionRadius = Math.min(width, height) * 0.1;
         
         // Calculate flocking forces for each boid
         for (let i = 0; i < swarmBoids.length; i++) {
@@ -339,12 +344,21 @@ class PerlinFlow {
                 cohesionY = (cohesionY / cohesionCount) - boid.y;
             }
             
-            // Update velocity with flocking behavior - stronger forces
-            boid.vx += separationX * 0.1 + alignmentX * 0.05 + cohesionX * 0.02;
-            boid.vy += separationY * 0.1 + alignmentY * 0.05 + cohesionY * 0.02;
+            // Update velocity with flocking behavior - use individual behavior variation
+            const individualFactor = boid.individualBehavior;
+            boid.vx += separationX * (0.15 + individualFactor * 0.1) + 
+                      alignmentX * (0.01 + individualFactor * 0.02) + 
+                      cohesionX * (0.03 + individualFactor * 0.02);
+            boid.vy += separationY * (0.15 + individualFactor * 0.1) + 
+                      alignmentY * (0.01 + individualFactor * 0.02) + 
+                      cohesionY * (0.03 + individualFactor * 0.02);
             
-            // Limit speed - allow faster movement
-            const maxSpeed = boid.speed * 2;
+            // Add individual randomness to prevent uniform behavior
+            boid.vx += (Math.random() - 0.5) * 0.15 * (1 + individualFactor);
+            boid.vy += (Math.random() - 0.5) * 0.15 * (1 + individualFactor);
+            
+            // Limit speed - keep reasonable bounds
+            const maxSpeed = boid.speed * 1.5;
             const speed = Math.sqrt(boid.vx * boid.vx + boid.vy * boid.vy);
             if (speed > maxSpeed) {
                 boid.vx = (boid.vx / speed) * maxSpeed;
@@ -371,13 +385,24 @@ class PerlinFlow {
                     const dx = x - boid.x;
                     const dy = y - boid.y;
                     const distance = Math.sqrt(dx * dx + dy * dy);
-                    // Much larger influence radius and stronger effect
-                    const influence = Math.exp(-distance * 0.005) * strength * 3;
                     
-                    if (influence > 0.01) {
-                        // Boid creates flow in its direction of movement - amplify velocity
-                        totalX += boid.vx * influence * 5;
-                        totalY += boid.vy * influence * 5;
+                    // Much smaller, more localized influence radius
+                    const maxInfluenceDistance = Math.min(width, height) * 0.15; // Limit influence range
+                    if (distance > maxInfluenceDistance) continue;
+                    
+                    const influence = Math.exp(-distance * 0.02) * strength; // Tighter falloff
+                    
+                    if (influence > 0.05) {
+                        // Create varied flow - mix boid direction with positional forces
+                        const boidInfluenceX = boid.vx * influence * 2;
+                        const boidInfluenceY = boid.vy * influence * 2;
+                        
+                        // Add radial force away from boid center for more variation
+                        const radialX = (dx / (distance + 1)) * influence * 0.5;
+                        const radialY = (dy / (distance + 1)) * influence * 0.5;
+                        
+                        totalX += boidInfluenceX + radialX;
+                        totalY += boidInfluenceY + radialY;
                         totalInfluence += influence;
                     }
                 }
