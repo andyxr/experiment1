@@ -126,12 +126,6 @@ class PixelMovementDemo {
                 parameterName: 'scatterStrength',
                 parser: parseInt
             },
-            {
-                sliderId: 'random-mirrors',
-                displayId: 'mirrors-value',
-                parameterName: 'randomMirrors',
-                parser: parseInt
-            }
         ];
         
         controls.forEach(({ sliderId, displayId, parameterName, parser }) => {
@@ -545,7 +539,6 @@ class PixelMovementDemo {
             ['region-threshold', params.regionThreshold],
             ['gravity-strength', params.gravityStrength],
             ['scatter-strength', params.scatterStrength],
-            ['random-mirrors', params.randomMirrors]
         ];
         
         const displayMap = {
@@ -555,7 +548,6 @@ class PixelMovementDemo {
             'region-threshold': 'threshold-value',
             'gravity-strength': 'gravity-value',
             'scatter-strength': 'scatter-value',
-            'random-mirrors': 'mirrors-value'
         };
 
         // Also update flow field controls
@@ -592,11 +584,6 @@ class PixelMovementDemo {
     visualizeGravityWells() {
         this.movementEngine.visualizeGravityWells();
         this.updateStatus('Showing gravity wells visualization.');
-    }
-
-    visualizeMirrorLines() {
-        this.movementEngine.visualizeMirrorLines();
-        this.updateStatus('Showing mirror lines visualization.');
     }
 
     visualizeDisplacement() {
