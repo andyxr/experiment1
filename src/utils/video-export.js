@@ -8,8 +8,8 @@ class VideoExporter {
         
         // Export settings
         this.settings = {
-            width: 800,
-            height: 600,
+            width: 1200,
+            height: 900,
             fps: 30,
             bitrate: 10000000, // 10 Mbps
             format: 'mp4', // or 'webm'

@@ -9,8 +9,8 @@ class MediabunnyMP4Exporter {
         
         // Export settings
         this.settings = {
-            width: 800,
-            height: 600,
+            width: 1200,
+            height: 900,
             fps: 30,
             bitrate: 2500000, // 2.5 Mbps
             videoCodec: 'avc' // 'avc' for H.264, 'vp9' for VP9

@@ -290,7 +290,7 @@ class PixelMovementDemo {
             this.regions = this.movementEngine.loadImage(imageData);
             
             this.updateStatus(`Image loaded. Found ${this.regions.length} regions. Click 'Start Animation' to begin.`);
-            this.enableControls(['analyze-btn', 'start-animation-btn']);
+            this.enableControls(['analyze-btn', 'start-animation-btn', 'export-btn']);
             this.updateStats();
             
             // Update canvas info
@@ -317,8 +317,8 @@ class PixelMovementDemo {
     }
 
     resizeCanvasForImage(image) {
-        const maxWidth = 800;
-        const maxHeight = 600;
+        const maxWidth = 1200;
+        const maxHeight = 900;
         
         let { width, height } = image;
         
@@ -370,7 +370,7 @@ class PixelMovementDemo {
     stopAnimation() {
         this.movementEngine.stopAnimation();
         this.updateStatus('Animation stopped.');
-        this.enableControls(['start-animation-btn', 'analyze-btn']);
+        this.enableControls(['start-animation-btn', 'analyze-btn', 'export-btn']);
         this.disableControls(['stop-animation-btn']);
     }
 
@@ -386,12 +386,15 @@ class PixelMovementDemo {
         }
         
         this.updateStatus('System reset. Ready for new configuration.');
-        this.enableControls(['analyze-btn', 'start-animation-btn']);
-        this.disableControls(['stop-animation-btn', 'export-btn']);
+        this.enableControls(['analyze-btn', 'start-animation-btn', 'export-btn']);
+        this.disableControls(['stop-animation-btn']);
         this.updateStats();
     }
 
     async exportVideo() {
+        // Disable export button while recording
+        this.disableControls(['export-btn']);
+        
         if (!this.movementEngine.isRunning) {
             this.updateStatus('Starting animation for video export...');
             this.startAnimation();
@@ -466,6 +469,7 @@ class PixelMovementDemo {
         } finally {
             this.isSimpleMP4Recording = false;
             this.movementEngine.clearFrameRecordCallback();
+            this.enableControls(['export-btn']);
         }
     }
 
@@ -512,6 +516,8 @@ class PixelMovementDemo {
         } catch (error) {
             this.updateStatus(`Export finalization failed: ${error.message}`);
             console.error(error);
+        } finally {
+            this.enableControls(['export-btn']);
         }
     }
 

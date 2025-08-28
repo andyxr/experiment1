@@ -12,8 +12,8 @@ class WebCodecsMP4Exporter {
         
         // Export settings
         this.settings = {
-            width: 800,
-            height: 600,
+            width: 1200,
+            height: 900,
             fps: 30,
             bitrate: 2500000, // 2.5 Mbps
             codec: 'avc1.42E01E' // H.264 baseline profile (mp4-muxer compatible)
