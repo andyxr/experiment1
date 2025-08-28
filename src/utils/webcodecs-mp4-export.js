@@ -15,8 +15,8 @@ class WebCodecsMP4Exporter {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 2500000, // 2.5 Mbps
-            codec: 'avc1.42E01E' // H.264 baseline profile (mp4-muxer compatible)
+            bitrate: 20000000, // 20 Mbps for higher quality
+            codec: 'avc1.64001E' // Prefer H.264 High profile when available
         };
     }
 
@@ -88,15 +88,22 @@ class WebCodecsMP4Exporter {
             });
 
             // Use the codec that was found to be working during checkCodecSupport
-            const encoderCodec = this.webCodecsWorkingCodec || 'avc1.42E01E';
+            const encoderCodec = this.webCodecsWorkingCodec || 'avc1.64001E';
             
             this.videoEncoder.configure({
                 codec: encoderCodec,
                 width: this.settings.width,
                 height: this.settings.height,
                 bitrate: this.settings.bitrate,
-                bitrateMode: 'constant',
-                framerate: this.settings.fps
+                bitrateMode: 'variable', // Allow encoder to allocate bits where needed
+                framerate: this.settings.fps,
+                latencyMode: 'realtime', // Reduce stutter by hinting realtime
+                hardwareAcceleration: 'prefer-hardware',
+                avc: {
+                    format: 'avc',
+                    // Prefer High or Main profiles; browsers may ignore but safe
+                    // Note: profile/level hints are UA-dependent
+                }
             });
 
             this.frameCount = 0;
@@ -123,7 +130,9 @@ class WebCodecsMP4Exporter {
             });
 
             // Encode the frame
-            this.videoEncoder.encode(videoFrame, { keyFrame: this.frameCount % 30 === 0 });
+            // Keyframe interval ~2s (GOP = fps * 2)
+            const gop = this.settings.fps * 2;
+            this.videoEncoder.encode(videoFrame, { keyFrame: this.frameCount % gop === 0 });
             
             // Clean up the frame
             videoFrame.close();
@@ -206,11 +215,14 @@ class WebCodecsMP4Exporter {
         // Test multiple codec options for WebCodecs
         // Prioritize VP9/VP8 since mp4-muxer works better with those
         const codecsToTest = [
-            'vp09.00.10.08', // VP9 - best for mp4-muxer compatibility
-            'vp8',           // VP8 - good fallback
+            // Prefer H.264 High/Main for MP4 quality
+            'avc1.640028',   // H.264 High (L4.0)
+            'avc1.64001E',   // H.264 High (L3.0)
+            'avc1.4D401E',   // H.264 Main
             'avc1.42E01E',   // H.264 Baseline
-            'avc1.42001E',   // H.264 Baseline alternate
-            'avc1.420028'    // H.264 Baseline alternate
+            // Keep VP9/VP8 last as fallbacks (may be used in WebM container)
+            'vp09.00.10.08',
+            'vp8'
         ];
 
         for (const codec of codecsToTest) {

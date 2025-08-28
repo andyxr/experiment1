@@ -12,7 +12,7 @@ class SimpleMP4Exporter {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 2500000 // 2.5 Mbps
+            bitrate: 20000000 // 20 Mbps for higher quality
         };
         
         this.workingCodec = null;
@@ -93,7 +93,10 @@ class SimpleMP4Exporter {
                 height: this.settings.height,
                 bitrate: this.settings.bitrate,
                 framerate: this.settings.fps,
-                bitrateMode: 'constant'
+                bitrateMode: 'variable',
+                latencyMode: 'realtime',
+                hardwareAcceleration: 'prefer-hardware',
+                avc: { format: 'avc' }
             };
             
             console.log('Configuring VideoEncoder with:', encoderConfig);
@@ -162,8 +165,8 @@ class SimpleMP4Exporter {
                 timestamp: timestamp
             });
 
-            // Encode the frame - force keyframe every second
-            const keyFrame = this.frameCount % this.settings.fps === 0;
+            // Encode the frame - keyframe every ~2 seconds for better quality
+            const keyFrame = this.frameCount % (this.settings.fps * 2) === 0;
             this.videoEncoder.encode(videoFrame, { keyFrame });
             
             // Clean up the frame

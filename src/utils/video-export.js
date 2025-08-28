@@ -11,7 +11,7 @@ class VideoExporter {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 10000000, // 10 Mbps
+            bitrate: 20000000, // 20 Mbps for higher quality
             format: 'mp4', // or 'webm'
             codec: 'h264' // or 'vp9'
         };
@@ -31,6 +31,11 @@ class VideoExporter {
         try {
             // Create a stream from the canvas
             this.stream = this.canvas.captureStream(this.settings.fps);
+            // Prefer detail over motion for better visual quality if supported
+            const track = this.stream.getVideoTracks && this.stream.getVideoTracks()[0];
+            if (track && 'contentHint' in track) {
+                track.contentHint = 'detail';
+            }
             
             // Configure recorder options
             const options = {
@@ -58,7 +63,7 @@ class VideoExporter {
             };
 
             // Start recording
-            this.mediaRecorder.start(100); // Collect data every 100ms
+            this.mediaRecorder.start(250); // Collect data every 250ms to reduce overhead
             this.isRecording = true;
 
             return true;
@@ -97,8 +102,11 @@ class VideoExporter {
     getMimeType() {
         // Try MP4 formats first
         const mp4Formats = [
-            'video/mp4;codecs=h264',
-            'video/mp4;codecs=avc1.42E01E',
+            // Prefer High/Main profiles for better quality
+            'video/mp4;codecs=avc1.640028', // H.264 High profile
+            'video/mp4;codecs=avc1.64001E', // H.264 High profile (alt)
+            'video/mp4;codecs=avc1.4D401E', // H.264 Main profile
+            'video/mp4;codecs=avc1.42E01E', // H.264 Baseline profile
             'video/mp4'
         ];
 
