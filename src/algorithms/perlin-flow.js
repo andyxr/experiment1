@@ -973,6 +973,112 @@ class PerlinFlow {
         return field;
     }
 
+    createFeedbackEchoFlow(width, height, previousFrames, strength = 1.0, timeOffset = 0, echoDecay = 0.8) {
+        const field = new Array(width * height);
+        
+        if (!previousFrames || previousFrames.length === 0) {
+            // Fallback to perlin noise if no previous frames
+            return this.createFlowField(width, height, 0.02, timeOffset);
+        }
+        
+        // MUCH more aggressive optimization - use only last 2 frames max
+        const maxFramesToUse = Math.min(2, previousFrames.length);
+        const framesToUse = previousFrames.slice(-maxFramesToUse);
+        
+        // Much coarser grid for feedback analysis - big performance boost
+        const feedbackGridSize = 32; // 32x32 pixel blocks
+        const gridWidth = Math.ceil(width / feedbackGridSize);
+        const gridHeight = Math.ceil(height / feedbackGridSize);
+        
+        // Pre-calculate feedback influence for each grid cell
+        const gridInfluence = new Array(gridWidth * gridHeight);
+        
+        // Only sample from the most recent frame for performance
+        const latestFrame = framesToUse[framesToUse.length - 1];
+        if (latestFrame && latestFrame.data) {
+            for (let gy = 0; gy < gridHeight; gy++) {
+                for (let gx = 0; gx < gridWidth; gx++) {
+                    const gridIndex = gy * gridWidth + gx;
+                    
+                    // Map to downsampled frame coordinates
+                    const centerX = Math.min(width - 1, gx * feedbackGridSize + feedbackGridSize / 2);
+                    const centerY = Math.min(height - 1, gy * feedbackGridSize + feedbackGridSize / 2);
+                    
+                    // Convert to downsampled frame coordinates
+                    const frameX = Math.floor((centerX / width) * latestFrame.width);
+                    const frameY = Math.floor((centerY / height) * latestFrame.height);
+                    const sampleIndex = (frameY * latestFrame.width + frameX) * 4;
+                    
+                    if (sampleIndex + 3 < latestFrame.data.length) {
+                        const r = latestFrame.data[sampleIndex];
+                        const g = latestFrame.data[sampleIndex + 1];
+                        const b = latestFrame.data[sampleIndex + 2];
+                        
+                        // Convert RGB to flow direction
+                        const brightness = (r + g + b) / (3 * 255);
+                        const colorAngle = Math.atan2(g - 128, r - 128) + timeOffset * 0.2;
+                        
+                        const influenceX = Math.cos(colorAngle) * brightness * strength * 3;
+                        const influenceY = Math.sin(colorAngle) * brightness * strength * 3;
+                        
+                        gridInfluence[gridIndex] = {
+                            x: influenceX,
+                            y: influenceY,
+                            magnitude: Math.sqrt(influenceX * influenceX + influenceY * influenceY)
+                        };
+                    } else {
+                        gridInfluence[gridIndex] = { x: 0, y: 0, magnitude: 0 };
+                    }
+                }
+            }
+        }
+        
+        // Generate flow field using pre-calculated grid influence
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // Find which grid cell this pixel belongs to
+                const gridX = Math.floor(x / feedbackGridSize);
+                const gridY = Math.floor(y / feedbackGridSize);
+                const gridIndex = gridY * gridWidth + gridX;
+                
+                let feedbackX = 0, feedbackY = 0;
+                if (gridIndex < gridInfluence.length && gridInfluence[gridIndex]) {
+                    feedbackX = gridInfluence[gridIndex].x;
+                    feedbackY = gridInfluence[gridIndex].y;
+                    
+                    // Add recursion - let feedback modify itself
+                    const recursionPhase = timeOffset + feedbackX + feedbackY;
+                    feedbackX += Math.sin(recursionPhase) * 0.5 * strength;
+                    feedbackY += Math.cos(recursionPhase) * 0.5 * strength;
+                }
+                
+                // Base noise for non-feedback areas
+                const baseNoise = this.noise2D(x * 0.02, y * 0.02 + timeOffset);
+                const baseAngle = baseNoise * Math.PI * 2;
+                const baseMagnitude = Math.abs(baseNoise) * 0.4;
+                
+                const baseX = Math.cos(baseAngle) * baseMagnitude;
+                const baseY = Math.sin(baseAngle) * baseMagnitude;
+                
+                // Simple blend
+                const blendFactor = Math.min(1, Math.sqrt(feedbackX * feedbackX + feedbackY * feedbackY) / 2);
+                const finalX = feedbackX * blendFactor + baseX * (1 - blendFactor);
+                const finalY = feedbackY * blendFactor + baseY * (1 - blendFactor);
+                
+                field[index] = {
+                    x: finalX,
+                    y: finalY,
+                    magnitude: Math.sqrt(finalX * finalX + finalY * finalY),
+                    echo: true
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

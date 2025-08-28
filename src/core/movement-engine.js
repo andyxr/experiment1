@@ -20,7 +20,7 @@ class MovementEngine {
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
             colorShift: 0, // 0-1 scale for color changing frequency (0=none, 1=frequent)
-            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial', 'chromatic', 'timeDisplacement'
+            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial', 'chromatic', 'timeDisplacement', 'feedbackEcho'
             flowStrength: 1.0,
             timeStep: 0.01,
             particleLifetime: 2000,
@@ -32,6 +32,12 @@ class MovementEngine {
         this.exportFrames = [];
         this.isRecording = false;
         this.frameRecordCallback = null; // Callback for WebCodecs frame recording
+        
+        // Feedback echo system
+        this.feedbackFrames = [];
+        this.maxFeedbackFrames = 3; // Keep only last 3 frames for performance
+        this.feedbackEchoDecay = 0.8;
+        this.feedbackIntensity = 1.0; // How strongly feedback affects flow
         
         // Gravity system
         this.gravityWells = [];
@@ -174,6 +180,11 @@ class MovementEngine {
                 // Use the full resolution for time displacement since it's region-based
                 flowField = this.perlinFlow.createTimeDisplacementFlow(
                     this.pixelManipulator.width, this.pixelManipulator.height, this.regions, time
+                );
+                break;
+            case 'feedbackEcho':
+                flowField = this.perlinFlow.createFeedbackEchoFlow(
+                    width, height, this.feedbackFrames, this.params.flowStrength, time, this.feedbackEchoDecay
                 );
                 break;
             default: // 'perlin'
@@ -739,6 +750,8 @@ class MovementEngine {
         let updateInterval = 30; // Default: every 30 frames
         if (this.params.flowFieldType === 'swarm' || this.params.flowFieldType === 'cellular' || this.params.flowFieldType === 'centrifugal' || this.params.flowFieldType === 'chromatic') {
             updateInterval = 5; // Every 5 frames for dynamic behavior
+        } else if (this.params.flowFieldType === 'feedbackEcho') {
+            updateInterval = 3; // Every 3 frames for feedback echo - balance between effect and performance
         }
         
         if (this.frameCount % updateInterval === 0) {
@@ -777,6 +790,9 @@ class MovementEngine {
         // Render frame with color shifting
         const frameData = this.pixelManipulator.renderFrame(this.params.colorShift);
         
+        // Capture frame for feedback echo if using that flow type
+        this.captureFeedbackFrame(frameData);
+        
         // Render trails on top of the main frame
         this.renderTrails();
         
@@ -802,6 +818,52 @@ class MovementEngine {
         this.frameRecordCallback = null;
     }
 
+    captureFeedbackFrame(frameData) {
+        if (!frameData) return;
+        
+        // Only capture frames every few frames to reduce overhead
+        if (this.frameCount % 3 !== 0) return;
+        
+        // Create a downsampled version for much better performance
+        const downsampleScale = 4; // 4x4 pixel blocks
+        const downsampledWidth = Math.floor(frameData.width / downsampleScale);
+        const downsampledHeight = Math.floor(frameData.height / downsampleScale);
+        const downsampledData = new Uint8ClampedArray(downsampledWidth * downsampledHeight * 4);
+        
+        // Downsample by taking every Nth pixel
+        for (let y = 0; y < downsampledHeight; y++) {
+            for (let x = 0; x < downsampledWidth; x++) {
+                const sourceX = x * downsampleScale;
+                const sourceY = y * downsampleScale;
+                const sourceIndex = (sourceY * frameData.width + sourceX) * 4;
+                const targetIndex = (y * downsampledWidth + x) * 4;
+                
+                if (sourceIndex + 3 < frameData.data.length) {
+                    downsampledData[targetIndex] = frameData.data[sourceIndex];     // R
+                    downsampledData[targetIndex + 1] = frameData.data[sourceIndex + 1]; // G
+                    downsampledData[targetIndex + 2] = frameData.data[sourceIndex + 2]; // B
+                    downsampledData[targetIndex + 3] = frameData.data[sourceIndex + 3]; // A
+                }
+            }
+        }
+        
+        const feedbackFrame = {
+            data: downsampledData,
+            width: downsampledWidth,
+            height: downsampledHeight,
+            originalWidth: frameData.width,
+            originalHeight: frameData.height,
+            timestamp: performance.now()
+        };
+        
+        this.feedbackFrames.push(feedbackFrame);
+        
+        // Keep only the last maxFeedbackFrames
+        if (this.feedbackFrames.length > this.maxFeedbackFrames) {
+            this.feedbackFrames.shift();
+        }
+    }
+
     reset() {
         this.stopAnimation();
         this.pixelManipulator.reset();
@@ -810,6 +872,9 @@ class MovementEngine {
         this.isRecording = false;
         this.frameRecordCallback = null;
         this.perlinFlow = new PerlinFlow(); // Reset time
+        
+        // Clear feedback frames
+        this.feedbackFrames = [];
     }
 
     startRecording() {
