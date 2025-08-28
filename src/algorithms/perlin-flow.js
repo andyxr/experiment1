@@ -890,7 +890,6 @@ class PerlinFlow {
         const effectiveRegionCount = Math.max(1, Math.floor(regions.length / 2));
         const regionStep = Math.max(1, Math.floor(regions.length / effectiveRegionCount));
         
-        console.log(`Time Displacement: ${regions.length} total regions -> using ${effectiveRegionCount} effective regions (step: ${regionStep})`);
         
         // Create a map of region time offsets - only for selected regions
         const regionTimeOffsets = new Map();
@@ -915,12 +914,14 @@ class PerlinFlow {
         
         // Create a coarse grid-based system instead of precise region mapping
         // This will give us the "blocky" effect you're looking for
-        const gridSize = Math.max(80, Math.floor(Math.min(width, height) / Math.sqrt(effectiveRegionCount * 0.3))); // Much larger blocks
+        // Much simpler approach: aim for 4-16 total blocks across the image
+        const targetBlocks = Math.max(4, Math.min(16, Math.ceil(effectiveRegionCount / 15))); // 4-16 blocks total
+        const gridSize = Math.floor(Math.min(width, height) / Math.sqrt(targetBlocks));
+        
         const gridWidth = Math.ceil(width / gridSize);
         const gridHeight = Math.ceil(height / gridSize);
         const totalGridCells = gridWidth * gridHeight;
         
-        console.log(`Time Displacement Grid: ${gridSize}px blocks, ${gridWidth}x${gridHeight} grid (${totalGridCells} cells)`);
         
         // Create time offsets for each grid cell
         const gridTimeOffsets = new Array(totalGridCells);
