@@ -20,7 +20,7 @@ class MovementEngine {
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
             colorShift: 0, // 0-1 scale for color changing frequency (0=none, 1=frequent)
-            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial', 'chromatic'
+            flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial', 'chromatic', 'timeDisplacement'
             flowStrength: 1.0,
             timeStep: 0.01,
             particleLifetime: 2000,
@@ -101,6 +101,11 @@ class MovementEngine {
                         this.pixelManipulator.height
                     );
                     this.loadImage(imageData);
+                    
+                    // If we're using Time Displacement, regenerate the flow field with new regions
+                    if (this.params.flowFieldType === 'timeDisplacement') {
+                        this.generateFlowField();
+                    }
                 }
             }
         }
@@ -165,12 +170,20 @@ class MovementEngine {
                     width, height, this.params.flowStrength, time, scale
                 );
                 break;
+            case 'timeDisplacement':
+                // Use the full resolution for time displacement since it's region-based
+                flowField = this.perlinFlow.createTimeDisplacementFlow(
+                    this.pixelManipulator.width, this.pixelManipulator.height, this.regions, time
+                );
+                break;
             default: // 'perlin'
                 flowField = this.perlinFlow.createFlowField(width, height, scale, time);
                 break;
         }
         
-        this.pixelManipulator.setFlowField(flowField);
+        // Pass full resolution flag for Time Displacement
+        const isFullResolution = this.params.flowFieldType === 'timeDisplacement';
+        this.pixelManipulator.setFlowField(flowField, isFullResolution);
     }
 
     generateGravityWells() {

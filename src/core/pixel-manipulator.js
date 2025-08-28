@@ -73,8 +73,9 @@ class PixelManipulator {
         });
     }
 
-    setFlowField(flowField) {
+    setFlowField(flowField, isFullResolution = false) {
         this.flowField = flowField;
+        this.flowFieldIsFullResolution = isFullResolution;
     }
     
     resetVelocities() {
@@ -118,10 +119,12 @@ class PixelManipulator {
                 y: (Math.random() - 0.5) * 0.05
             };
             
-            // Combine forces - special handling for chromatic flow
+            // Combine forces - special handling for specific flow types
             let flowWeight = 0.1;
             if (this.flowField && this.flowField[0]?.chromatic) {
                 flowWeight = 0.8; // Much stronger weight for chromatic flow
+            } else if (this.flowFieldIsFullResolution) {
+                flowWeight = 0.9; // Very strong weight for Time Displacement
             }
             
             const totalForceX = flowVector.x * flowWeight + brightnessForce.x * 0.25 + regionForce.x * 0.1 + noiseForce.x * 0.05;
@@ -198,13 +201,21 @@ class PixelManipulator {
     sampleFlowField(x, y) {
         if (!this.flowField) return {x: 0, y: 0};
         
-        // Flow field is at 1/4 resolution (as per movement-engine.js line 115-116)
-        const fieldWidth = Math.floor(this.width / 4);
-        const fieldHeight = Math.floor(this.height / 4);
+        let fieldWidth, fieldHeight, fx, fy;
         
-        // Map pixel coordinates to flow field coordinates
-        const fx = Math.floor((x / this.width) * fieldWidth);
-        const fy = Math.floor((y / this.height) * fieldHeight);
+        if (this.flowFieldIsFullResolution) {
+            // Full resolution flow field (like Time Displacement)
+            fieldWidth = this.width;
+            fieldHeight = this.height;
+            fx = Math.floor(x);
+            fy = Math.floor(y);
+        } else {
+            // Quarter resolution flow field (standard)
+            fieldWidth = Math.floor(this.width / 4);
+            fieldHeight = Math.floor(this.height / 4);
+            fx = Math.floor((x / this.width) * fieldWidth);
+            fy = Math.floor((y / this.height) * fieldHeight);
+        }
         
         // Clamp to valid range
         const clampedFx = Math.max(0, Math.min(fieldWidth - 1, fx));

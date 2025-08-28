@@ -878,6 +878,100 @@ class PerlinFlow {
         return field;
     }
 
+    createTimeDisplacementFlow(width, height, regions, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        if (!regions || regions.length === 0) {
+            // Fallback to simple perlin if no regions
+            return this.createFlowField(width, height, 0.01, timeOffset);
+        }
+        
+        // Use half the regions for a coarser, less granular effect
+        const effectiveRegionCount = Math.max(1, Math.floor(regions.length / 2));
+        const regionStep = Math.max(1, Math.floor(regions.length / effectiveRegionCount));
+        
+        console.log(`Time Displacement: ${regions.length} total regions -> using ${effectiveRegionCount} effective regions (step: ${regionStep})`);
+        
+        // Create a map of region time offsets - only for selected regions
+        const regionTimeOffsets = new Map();
+        const selectedRegions = [];
+        
+        for (let i = 0; i < regions.length; i += regionStep) {
+            selectedRegions.push(regions[i]);
+        }
+        
+        selectedRegions.forEach((region, index) => {
+            // Each region gets a unique time offset based on its index and position
+            const centerX = region.boundingBox ? (region.boundingBox.minX + region.boundingBox.maxX) / 2 : 0;
+            const centerY = region.boundingBox ? (region.boundingBox.minY + region.boundingBox.maxY) / 2 : 0;
+            
+            // Create time offset based on region index and spatial position
+            const spatialOffset = (centerX / width + centerY / height) * Math.PI;
+            const indexOffset = (index / selectedRegions.length) * Math.PI * 2;
+            const regionTime = timeOffset + spatialOffset + indexOffset;
+            
+            regionTimeOffsets.set(region, regionTime);
+        });
+        
+        // Create a coarse grid-based system instead of precise region mapping
+        // This will give us the "blocky" effect you're looking for
+        const gridSize = Math.max(80, Math.floor(Math.min(width, height) / Math.sqrt(effectiveRegionCount * 0.3))); // Much larger blocks
+        const gridWidth = Math.ceil(width / gridSize);
+        const gridHeight = Math.ceil(height / gridSize);
+        const totalGridCells = gridWidth * gridHeight;
+        
+        console.log(`Time Displacement Grid: ${gridSize}px blocks, ${gridWidth}x${gridHeight} grid (${totalGridCells} cells)`);
+        
+        // Create time offsets for each grid cell
+        const gridTimeOffsets = new Array(totalGridCells);
+        for (let i = 0; i < totalGridCells; i++) {
+            const gridX = i % gridWidth;
+            const gridY = Math.floor(i / gridWidth);
+            
+            // Create time offset based on grid position - much more dramatic offsets
+            const spatialOffset = ((gridX / gridWidth) + (gridY / gridHeight)) * Math.PI * 4; // Increased
+            const indexOffset = (i / totalGridCells) * Math.PI * 8; // Much more dramatic
+            gridTimeOffsets[i] = timeOffset + spatialOffset + indexOffset;
+        }
+        
+        // Generate flow field with grid-based time offsets
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // Find which grid cell this pixel belongs to
+                const gridX = Math.floor(x / gridSize);
+                const gridY = Math.floor(y / gridSize);
+                const gridIndex = gridY * gridWidth + gridX;
+                
+                // Use the grid cell's time offset
+                const regionTime = gridTimeOffsets[gridIndex] || timeOffset;
+                
+                // Generate flow based on grid cell time - more uniform within each block
+                const blockNoise = this.noise2D(gridX * 0.1, regionTime);
+                const blockNoiseY = this.noise2D(gridY * 0.1, regionTime + 100);
+                
+                // Much less spatial variation within the grid cell for blockier effect
+                const timeModulation = Math.sin(regionTime) * 0.8; // Stronger modulation
+                
+                // Create directional flow that's consistent within each grid cell
+                const angle = regionTime + blockNoise * Math.PI * 2; // More dramatic angle variation
+                const magnitude = (0.8 + Math.abs(blockNoise) * 0.4) * (1 + timeModulation); // Stronger magnitude
+                
+                const vectorX = Math.cos(angle) * magnitude;
+                const vectorY = Math.sin(angle) * magnitude;
+                
+                field[index] = {
+                    x: vectorX,
+                    y: vectorY,
+                    magnitude: magnitude
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

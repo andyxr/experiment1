@@ -211,6 +211,7 @@ class PixelMovementDemo {
             typeSelect.addEventListener('change', (e) => {
                 const value = e.target.value;
                 this.movementEngine.setParameter('flowFieldType', value);
+                this.updateFlowStrengthSliderState(value);
             });
             console.log('Flow field type control initialized');
         }
@@ -226,6 +227,32 @@ class PixelMovementDemo {
                 strengthDisplay.textContent = value;
             });
             console.log('Flow strength control initialized');
+        }
+    }
+
+    updateFlowStrengthSliderState(flowFieldType) {
+        const strengthSlider = document.getElementById('flow-strength');
+        const strengthDisplay = document.getElementById('flow-strength-value');
+        const strengthLabel = strengthSlider ? strengthSlider.parentElement.querySelector('label') : null;
+        
+        if (strengthSlider && strengthDisplay) {
+            if (flowFieldType === 'timeDisplacement') {
+                // Disable flow strength for Time Displacement
+                strengthSlider.disabled = true;
+                strengthDisplay.style.opacity = '0.5';
+                if (strengthLabel) {
+                    strengthLabel.style.opacity = '0.5';
+                }
+                strengthDisplay.textContent = 'N/A';
+            } else {
+                // Enable flow strength for other flow types
+                strengthSlider.disabled = false;
+                strengthDisplay.style.opacity = '1.0';
+                if (strengthLabel) {
+                    strengthLabel.style.opacity = '1.0';
+                }
+                strengthDisplay.textContent = strengthSlider.value;
+            }
         }
     }
 
@@ -558,6 +585,9 @@ class PixelMovementDemo {
         if (flowTypeSelect) flowTypeSelect.value = params.flowFieldType;
         if (flowStrengthSlider) flowStrengthSlider.value = params.flowStrength;
         if (flowStrengthDisplay) flowStrengthDisplay.textContent = params.flowStrength;
+        
+        // Update flow strength slider state
+        this.updateFlowStrengthSliderState(params.flowFieldType);
         
         updates.forEach(([id, value]) => {
             const slider = document.getElementById(id);
