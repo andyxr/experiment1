@@ -259,13 +259,13 @@ class PixelManipulator {
             const currentIndex = currentY * this.width + currentX;
             
             // Copy original pixel color to displaced position
-            if (originalIndex >= 0 && originalIndex * 4 < this.originalData.length &&
+            if (originalIndex >= 0 && 
                 currentIndex >= 0 && currentIndex * 4 < displacedData.length) {
                 
-                displacedData[currentIndex * 4] = this.originalData[originalIndex * 4];         // R
-                displacedData[currentIndex * 4 + 1] = this.originalData[originalIndex * 4 + 1]; // G
-                displacedData[currentIndex * 4 + 2] = this.originalData[originalIndex * 4 + 2]; // B
-                displacedData[currentIndex * 4 + 3] = this.originalData[originalIndex * 4 + 3]; // A
+                displacedData[currentIndex * 4] = this.originalData[originalIndex * 4];
+                displacedData[currentIndex * 4 + 1] = this.originalData[originalIndex * 4 + 1];
+                displacedData[currentIndex * 4 + 2] = this.originalData[originalIndex * 4 + 2];
+                displacedData[currentIndex * 4 + 3] = this.originalData[originalIndex * 4 + 3];
             }
         }
         

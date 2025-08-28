@@ -20,6 +20,7 @@ class MovementEngine {
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
+            colorShift: 0, // 0-1 scale for color changing frequency (0=none, 1=frequent)
             flowFieldType: 'perlin', // 'perlin', 'turbulent', 'directional', 'vortex', 'wave', 'swarm', 'magnetic', 'cellular', 'centrifugal', 'radial', 'chromatic'
             flowStrength: 1.0,
             timeStep: 0.01,
@@ -961,7 +962,8 @@ class MovementEngine {
         this.pixelManipulator.updatePixelPositions(
             deltaTime,
             this.params.movementSpeed,
-            this.params.brightnessSensitivity
+            this.params.brightnessSensitivity,
+            this.params.colorShift
         );
         
         // Apply mirror reflections BEFORE scatter (so scatter can also be reflected)
@@ -979,8 +981,8 @@ class MovementEngine {
         // Apply trails to create ghosting effects on moving pixels
         this.applyTrails();
         
-        // Render frame
-        const frameData = this.pixelManipulator.renderFrame();
+        // Render frame with color shifting
+        const frameData = this.pixelManipulator.renderFrame(this.params.colorShift);
         
         // Render trails on top of the main frame
         this.renderTrails();

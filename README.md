@@ -1,4 +1,4 @@
-# Novel Pixel Movement - Image to Video
+# Dream Frame - Image to Video
 
 An experimental creative coding project that transforms still images into dynamic videos by analyzing color and brightness regions and applying algorithmic movement patterns.
 
