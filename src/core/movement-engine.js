@@ -41,7 +41,7 @@ class MovementEngine {
         
         // Gravity system
         this.gravityWells = [];
-        this.gravityRadius = 80; // Pixels within this radius are affected
+        this.gravityRadius = 200; // Pixels within this radius are affected
         
         // Scan line interference system
         this.scanLinePhase = 0; // For animating the interference pattern
@@ -204,7 +204,7 @@ class MovementEngine {
         }
         
         // Much more reasonable number of gravity wells - not based on total pixels
-        const wellCount = Math.min(10, Math.floor(this.params.gravityStrength * 2)); // Max 10 wells
+        const wellCount = Math.max(1, Math.min(10, Math.ceil(this.params.gravityStrength * 2))); // Min 1, Max 10 wells
         
         this.gravityWells = [];
         for (let i = 0; i < wellCount; i++) {
@@ -240,7 +240,7 @@ class MovementEngine {
                 // Only affect pixels within gravity radius
                 if (distance < this.gravityRadius && distance > 1) {
                     // DRAMATICALLY stronger gravity force!
-                    const force = (well.strength * 200.0) / Math.max(distance, 10); // Double intensity!
+                    const force = (well.strength * 500.0) / Math.max(distance, 5); // Much stronger intensity!
                     const forceX = (dx / distance) * force;
                     const forceY = (dy / distance) * force;
                     
@@ -253,24 +253,16 @@ class MovementEngine {
                     pixelVelocities[i].y += forceY * sampleRate * 3;
                     
                     // Also directly move pixel slightly toward well for immediate visible effect
-                    const directMoveStrength = well.strength * 0.1;
+                    const directMoveStrength = well.strength * 0.3;
                     pixelPositions[i].x += (dx / distance) * directMoveStrength;
                     pixelPositions[i].y += (dy / distance) * directMoveStrength;
                     
                     forcesApplied++;
                     
-                    // Debug first few applications
-                    if (forcesApplied < 3) {
-                        console.log(`Strong gravity on pixel ${i}: force(${forceX.toFixed(3)}, ${forceY.toFixed(3)}) vel ${oldVelX.toFixed(3)} -> ${pixelVelocities[i].x.toFixed(3)}`);
-                    }
                 }
             }
         }
         
-        // Debug logging every 120 frames (about every 4 seconds)
-        if (this.frameCount % 120 === 0 && forcesApplied > 0) {
-            console.log(`Gravity: ${this.gravityWells.length} wells, ${forcesApplied} forces applied, strength: ${this.params.gravityStrength}`);
-        }
     }
 
     applyScatterForces() {
