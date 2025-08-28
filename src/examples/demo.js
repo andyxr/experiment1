@@ -76,6 +76,9 @@ class PixelMovementDemo {
         // Initialize flow field controls
         this.initializeFlowFieldControls();
         
+        // Initialize Scatter Pulse controls
+        this.initializeScatterPulseControls();
+        
         // Update interface
         this.updateStatus('System initialized. Ready to load image...');
         this.updateStats();
@@ -126,6 +129,12 @@ class PixelMovementDemo {
                 parameterName: 'scatterStrength',
                 parser: parseInt
             },
+            {
+                sliderId: 'scatter-pulse-probability',
+                displayId: 'scatter-pulse-probability-value',
+                parameterName: 'scatterPulseProbability',
+                parser: parseInt
+            },
         ];
         
         controls.forEach(({ sliderId, displayId, parameterName, parser }) => {
@@ -152,6 +161,30 @@ class PixelMovementDemo {
         
         // Animation frame updates
         this.setupAnimationLoop();
+    }
+
+    initializeScatterPulseControls() {
+        const checkbox = document.getElementById('scatter-pulse-enabled');
+        const probSlider = document.getElementById('scatter-pulse-probability');
+        const probDisplay = document.getElementById('scatter-pulse-probability-value');
+        
+        if (checkbox) {
+            checkbox.checked = !!this.movementEngine.params.scatterPulseEnabled;
+            checkbox.addEventListener('change', (e) => {
+                const enabled = e.target.checked;
+                this.movementEngine.setParameter('scatterPulseEnabled', enabled);
+                if (probSlider) probSlider.disabled = !enabled;
+                if (probDisplay) probDisplay.style.opacity = enabled ? '1.0' : '0.5';
+            });
+        }
+        if (probSlider) {
+            probSlider.value = this.movementEngine.params.scatterPulseProbability || 0;
+            probSlider.disabled = !this.movementEngine.params.scatterPulseEnabled;
+        }
+        if (probDisplay) {
+            probDisplay.textContent = this.movementEngine.params.scatterPulseProbability || 0;
+            probDisplay.style.opacity = this.movementEngine.params.scatterPulseEnabled ? '1.0' : '0.5';
+        }
     }
 
     initializeScanLineControl() {

@@ -16,6 +16,8 @@ class MovementEngine {
             regionThreshold: 30,
             gravityStrength: 0.0,
             scatterStrength: 0,
+            scatterPulseEnabled: false,
+            scatterPulseProbability: 0,
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
@@ -54,6 +56,14 @@ class MovementEngine {
         this.trailPixels = new Set(); // Pixels selected for trailing
         this.trailHistory = new Map(); // Stores trail positions for each pixel
         this.pixelColorCache = new Map(); // Cache pixel colors to avoid repeated calculations
+
+        // Scatter Pulse runtime state
+        this.scatterPulse = {
+            windowMs: 5000,
+            windowStartMs: 0,
+            scheduledAtMs: null,
+            activeFramesRemaining: 0
+        };
     }
 
     initialize(canvas) {
@@ -114,7 +124,78 @@ class MovementEngine {
                     }
                 }
             }
+
+            // Handle Scatter Pulse runtime resets when toggled or probability changes
+            if (name === 'scatterPulseEnabled') {
+                if (value) {
+                    const now = performance.now();
+                    this.scatterPulse.windowStartMs = now;
+                    this.scatterPulse.scheduledAtMs = null;
+                    this.scatterPulse.activeFramesRemaining = 0;
+                    this.scheduleScatterPulseForWindow(now);
+                } else {
+                    this.scatterPulse.scheduledAtMs = null;
+                    this.scatterPulse.activeFramesRemaining = 0;
+                }
+            }
+            if (name === 'scatterPulseProbability') {
+                // Recompute scheduling for current window
+                this.scheduleScatterPulseForWindow(this.scatterPulse.windowStartMs || performance.now());
+            }
         }
+    }
+
+    // Schedules at most one pulse within the 5s window based on probability slider
+    scheduleScatterPulseForWindow(startTimeMs) {
+        if (!this.params.scatterPulseEnabled) {
+            this.scatterPulse.scheduledAtMs = null;
+            return;
+        }
+        const p = Math.max(0, Math.min(100, this.params.scatterPulseProbability)) / 100;
+        if (p <= 0) {
+            this.scatterPulse.scheduledAtMs = null;
+            return;
+        }
+        // Decide if this window will have a pulse
+        const willPulse = Math.random() < p || p === 1;
+        if (!willPulse) {
+            this.scatterPulse.scheduledAtMs = null;
+            return;
+        }
+        const randOffset = Math.random() * this.scatterPulse.windowMs;
+        this.scatterPulse.scheduledAtMs = startTimeMs + randOffset;
+    }
+
+    updateScatterPulse(currentTimeMs) {
+        if (!this.params.scatterPulseEnabled) return;
+        // Initialize window start if needed
+        if (!this.scatterPulse.windowStartMs) {
+            this.scatterPulse.windowStartMs = currentTimeMs;
+            this.scheduleScatterPulseForWindow(this.scatterPulse.windowStartMs);
+        }
+        // Advance window every 5 seconds
+        while (currentTimeMs - this.scatterPulse.windowStartMs >= this.scatterPulse.windowMs) {
+            this.scatterPulse.windowStartMs += this.scatterPulse.windowMs;
+            this.scatterPulse.scheduledAtMs = null;
+            this.scheduleScatterPulseForWindow(this.scatterPulse.windowStartMs);
+        }
+        // Activate pulse when scheduled time arrives
+        if (this.scatterPulse.scheduledAtMs !== null && currentTimeMs >= this.scatterPulse.scheduledAtMs && this.scatterPulse.activeFramesRemaining === 0) {
+            this.scatterPulse.activeFramesRemaining = 2; // Active for 3 frames
+            // Clear the schedule so it does not retrigger repeatedly within the same window
+            this.scatterPulse.scheduledAtMs = null;
+        }
+    }
+
+    isScatterPulseActive() {
+        return this.scatterPulse.activeFramesRemaining > 0;
+    }
+
+    getEffectiveScatterStrength() {
+        if (this.isScatterPulseActive()) return 90;
+        // When Scatter Pulse is enabled but not active, strength must drop to 0
+        if (this.params.scatterPulseEnabled) return 0;
+        return this.params.scatterStrength;
     }
 
     generateFlowField() {
@@ -266,9 +347,10 @@ class MovementEngine {
     }
 
     applyScatterForces() {
-        if (this.params.scatterStrength <= 0) return;
+        const effectiveStrength = this.getEffectiveScatterStrength();
+        if (effectiveStrength <= 0) return;
         
-        // Apply scatter more frequently for better visual effect
+        // Apply scatter every 3rd frame for consistency regardless of pulse
         if (this.frameCount % 3 !== 0) return; // Every 3rd frame for more dramatic effect
         
         const pixelPositions = this.pixelManipulator.pixelPositions;
@@ -276,9 +358,9 @@ class MovementEngine {
         
         // Calculate how many pixels to scatter based on percentage  
         const totalPixels = pixelPositions.length;
-        const scatterCount = Math.floor((this.params.scatterStrength / 100) * totalPixels / 3); // Divide by 3 since we apply every 3 frames
+        const scatterCount = Math.floor((effectiveStrength / 100) * totalPixels / 3); // Divide by 3 since we apply every 3 frames
         
-        console.log(`Scatter debug: totalPixels=${totalPixels}, scatterStrength=${this.params.scatterStrength}, scatterCount=${scatterCount}`);
+        console.log(`Scatter debug: totalPixels=${totalPixels}, scatterStrength=${effectiveStrength}, scatterCount=${scatterCount}`);
         
         if (scatterCount === 0) {
             console.log("Scatter count is 0 - no pixels will be scattered");
@@ -312,7 +394,7 @@ class MovementEngine {
             pixelVelocities[pixelIndex].y = scatterVelY;
             
             // ALSO directly move the pixel position for immediate visible effect - MAKE IT BIG
-            const jumpDistance = 40 + (this.params.scatterStrength * 2); // Big but not overwhelming jumps
+            const jumpDistance = 40 + (effectiveStrength * 2); // Big but not overwhelming jumps
             const oldX = pixelPositions[pixelIndex].x;
             const oldY = pixelPositions[pixelIndex].y;
             
@@ -327,7 +409,7 @@ class MovementEngine {
         
         // Debug logging
         if (this.frameCount % 120 === 0 && scatterCount > 0) {
-            console.log(`Scatter: ${scatterCount} pixels scattered (${this.params.scatterStrength}%), total affected per second: ~${scatterCount * 6}`);
+            console.log(`Scatter: ${scatterCount} pixels scattered (${effectiveStrength}%), total affected per second: ~${scatterCount * 6}`);
         }
     }
 
@@ -767,8 +849,14 @@ class MovementEngine {
             this.params.colorShift
         );
         
+        // Update and apply Scatter Pulse logic
+        this.updateScatterPulse(currentTime);
         // Apply scatter forces AFTER position update
         this.applyScatterForces();
+        // Decrement pulse frames at the end of frame
+        if (this.scatterPulse.activeFramesRemaining > 0) {
+            this.scatterPulse.activeFramesRemaining--;
+        }
         
         // Apply scan line interference for CRT-like distortion effects
         this.applyScanLineInterference();
