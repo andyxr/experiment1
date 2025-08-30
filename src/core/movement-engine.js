@@ -268,6 +268,11 @@ class MovementEngine {
                     width, height, this.feedbackFrames, this.params.flowStrength, time, this.feedbackEchoDecay
                 );
                 break;
+            case 'lidar':
+                flowField = this.perlinFlow.createLidarFlow(
+                    width, height, this.params.flowStrength, time
+                );
+                break;
             default: // 'perlin'
                 flowField = this.perlinFlow.createFlowField(width, height, scale, time);
                 break;

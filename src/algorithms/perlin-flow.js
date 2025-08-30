@@ -1079,6 +1079,63 @@ class PerlinFlow {
         return field;
     }
 
+    createLidarFlow(width, height, strength = 1.0, timeOffset = 0) {
+        const field = new Array(width * height);
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        // LiDAR scanning parameters
+        const scanSpeed = timeOffset * 0.5; // Speed of scanning rotation (slower for visibility)
+        const scanAngle = scanSpeed % (Math.PI * 2); // Current scan line angle
+        const scanLineWidth = 50; // Width of scan line effect (much wider)
+        const maxDistance = Math.sqrt(centerX * centerX + centerY * centerY);
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // Calculate polar coordinates from center
+                const deltaX = x - centerX;
+                const deltaY = y - centerY;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const pixelAngle = Math.atan2(deltaY, deltaX);
+                
+                // Normalize angle to [0, 2π]
+                const normalizedPixelAngle = (pixelAngle + Math.PI * 2) % (Math.PI * 2);
+                const normalizedScanAngle = (scanAngle + Math.PI * 2) % (Math.PI * 2);
+                
+                // Calculate distance from scan line
+                let angleDiff = Math.abs(normalizedPixelAngle - normalizedScanAngle);
+                if (angleDiff > Math.PI) {
+                    angleDiff = Math.PI * 2 - angleDiff;
+                }
+                
+                // LiDAR scanning effect - particles move when hit by scan line
+                let scanInfluence = 0;
+                if (angleDiff < 0.3) { // Much wider angle threshold (about 17 degrees on each side)
+                    scanInfluence = 1.0 - (angleDiff / 0.3); // Linear falloff instead of cosine
+                }
+                
+                // LiDAR scan line effect - much stronger force for visibility
+                const scanForceX = Math.cos(scanAngle) * scanInfluence * 5.0;
+                const scanForceY = Math.sin(scanAngle) * scanInfluence * 5.0;
+                
+                const finalX = scanForceX * strength;
+                const finalY = scanForceY * strength;
+                
+                field[index] = {
+                    x: finalX,
+                    y: finalY,
+                    magnitude: Math.sqrt(finalX * finalX + finalY * finalY),
+                    lidar: true,
+                    scanInfluence: scanInfluence // For potential visual effects
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         
