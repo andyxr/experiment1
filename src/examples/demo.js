@@ -130,6 +130,12 @@ class PixelMovementDemo {
                 parser: parseInt
             },
             {
+                sliderId: 'height-map-strength',
+                displayId: 'height-map-value',
+                parameterName: 'heightMapStrength',
+                parser: parseFloat
+            },
+            {
                 sliderId: 'scatter-pulse-probability',
                 displayId: 'scatter-pulse-probability-value',
                 parameterName: 'scatterPulseProbability',
@@ -605,6 +611,7 @@ class PixelMovementDemo {
             ['region-threshold', params.regionThreshold],
             ['gravity-strength', params.gravityStrength],
             ['scatter-strength', params.scatterStrength],
+            ['height-map-strength', params.heightMapStrength || 0.0],
         ];
         
         const displayMap = {
@@ -614,6 +621,7 @@ class PixelMovementDemo {
             'region-threshold': 'threshold-value',
             'gravity-strength': 'gravity-value',
             'scatter-strength': 'scatter-value',
+            'height-map-strength': 'height-map-value',
         };
 
         // Also update flow field controls

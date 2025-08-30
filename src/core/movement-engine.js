@@ -18,6 +18,7 @@ class MovementEngine {
             scatterStrength: 0,
             scatterPulseEnabled: false,
             scatterPulseProbability: 0,
+            heightMapStrength: 0.0,
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
@@ -875,6 +876,11 @@ class MovementEngine {
         // Render frame with color shifting
         const frameData = this.pixelManipulator.renderFrame(this.params.colorShift);
         
+        // Apply height map effect if enabled
+        if (this.params.heightMapStrength > 0) {
+            this.applyHeightMapEffect(frameData);
+        }
+        
         // Capture frame for feedback echo if using that flow type
         this.captureFeedbackFrame(frameData);
         
@@ -1178,6 +1184,67 @@ class MovementEngine {
 
     exportCurrentFrame() {
         return this.pixelManipulator.exportFrame();
+    }
+
+    applyHeightMapEffect(frameData) {
+        if (!frameData || this.params.heightMapStrength === 0) return;
+        
+        const width = this.pixelManipulator.width;
+        const height = this.pixelManipulator.height;
+        const data = frameData.data;
+        const strength = this.params.heightMapStrength;
+        
+        // Create a new image data for the height map effect
+        const heightMapData = new Uint8ClampedArray(data.length);
+        
+        // Clear with black
+        for (let i = 0; i < heightMapData.length; i += 4) {
+            heightMapData[i] = 0;     // R
+            heightMapData[i + 1] = 0; // G  
+            heightMapData[i + 2] = 0; // B
+            heightMapData[i + 3] = 255; // A
+        }
+        
+        // Process each pixel
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const pixelIndex = (y * width + x) * 4;
+                
+                // Get original pixel color
+                const r = data[pixelIndex];
+                const g = data[pixelIndex + 1];
+                const b = data[pixelIndex + 2];
+                
+                // Calculate brightness (0-1)
+                const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+                
+                // Calculate height based on brightness
+                const maxHeight = Math.floor(height * 0.3); // Max 30% of canvas height
+                const lineHeight = Math.floor(brightness * maxHeight * strength);
+                
+                // Draw vertical line from current y position upward
+                for (let lineY = y; lineY >= Math.max(0, y - lineHeight); lineY--) {
+                    const targetIndex = (lineY * width + x) * 4;
+                    
+                    // Use original pixel color for the line
+                    heightMapData[targetIndex] = r;
+                    heightMapData[targetIndex + 1] = g;
+                    heightMapData[targetIndex + 2] = b;
+                    heightMapData[targetIndex + 3] = 255;
+                }
+            }
+        }
+        
+        // Blend the height map with the original image
+        const blendFactor = strength;
+        for (let i = 0; i < data.length; i += 4) {
+            data[i] = Math.floor(data[i] * (1 - blendFactor) + heightMapData[i] * blendFactor);
+            data[i + 1] = Math.floor(data[i + 1] * (1 - blendFactor) + heightMapData[i + 1] * blendFactor);
+            data[i + 2] = Math.floor(data[i + 2] * (1 - blendFactor) + heightMapData[i + 2] * blendFactor);
+        }
+        
+        // Update the canvas
+        this.ctx.putImageData(frameData, 0, 0);
     }
 
     createPresets() {
