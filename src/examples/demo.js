@@ -136,6 +136,12 @@ class PixelMovementDemo {
                 parser: parseFloat
             },
             {
+                sliderId: 'height-map-rotation-speed',
+                displayId: 'height-map-rotation-value',
+                parameterName: 'heightMapRotationSpeed',
+                parser: parseFloat
+            },
+            {
                 sliderId: 'scatter-pulse-probability',
                 displayId: 'scatter-pulse-probability-value',
                 parameterName: 'scatterPulseProbability',
@@ -157,6 +163,24 @@ class PixelMovementDemo {
                 });
             }
         });
+        
+        // Special handling for height map rotation slider enable/disable
+        const heightMapSlider = document.getElementById('height-map-strength');
+        const heightMapRotationSlider = document.getElementById('height-map-rotation-speed');
+        
+        if (heightMapSlider && heightMapRotationSlider) {
+            const updateRotationSliderState = () => {
+                const heightMapValue = parseFloat(heightMapSlider.value);
+                heightMapRotationSlider.disabled = heightMapValue === 0.0;
+                heightMapRotationSlider.style.opacity = heightMapValue === 0.0 ? '0.5' : '1.0';
+            };
+            
+            // Initial state
+            updateRotationSliderState();
+            
+            // Update on height map slider change
+            heightMapSlider.addEventListener('input', updateRotationSliderState);
+        }
         
         // Buttons
         document.getElementById('analyze-btn').addEventListener('click', () => this.analyzeCurrentImage());
@@ -612,6 +636,7 @@ class PixelMovementDemo {
             ['gravity-strength', params.gravityStrength],
             ['scatter-strength', params.scatterStrength],
             ['height-map-strength', params.heightMapStrength || 0.0],
+            ['height-map-rotation-speed', params.heightMapRotationSpeed || 0.5],
         ];
         
         const displayMap = {
@@ -622,6 +647,7 @@ class PixelMovementDemo {
             'gravity-strength': 'gravity-value',
             'scatter-strength': 'scatter-value',
             'height-map-strength': 'height-map-value',
+            'height-map-rotation-speed': 'height-map-rotation-value',
         };
 
         // Also update flow field controls

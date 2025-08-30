@@ -19,6 +19,7 @@ class MovementEngine {
             scatterPulseEnabled: false,
             scatterPulseProbability: 0,
             heightMapStrength: 0.0,
+            heightMapRotationSpeed: 0.5,
             scanLineInterference: 0, // 0-10 scale for interference strength
             kaleidoscopeFractal: 0, // 0-10 scale for kaleidoscope symmetry intensity
             trails: 0, // 0-10 scale for trailing effect percentage (0=0%, 10=100%)
@@ -1222,15 +1223,33 @@ class MovementEngine {
                 const maxHeight = Math.floor(height * 0.3); // Max 30% of canvas height
                 const lineHeight = Math.floor(brightness * maxHeight * strength);
                 
-                // Draw vertical line from current y position upward
-                for (let lineY = y; lineY >= Math.max(0, y - lineHeight); lineY--) {
-                    const targetIndex = (lineY * width + x) * 4;
+                // Calculate rotation angle based on time and position
+                const rotationSpeed = this.frameCount * 0.02 * this.params.heightMapRotationSpeed; // User-controlled rotation
+                const baseAngle = Math.atan2(y - height/2, x - width/2); // Radial pattern
+                const rotationAngle = rotationSpeed + baseAngle * 0.5; // Combine time and position
+                
+                // Calculate direction vector for rotated line
+                const dirX = Math.cos(rotationAngle + Math.PI/2); // Start perpendicular (vertical)
+                const dirY = Math.sin(rotationAngle + Math.PI/2);
+                
+                // Draw rotated line
+                for (let step = 0; step < lineHeight; step++) {
+                    const offsetX = Math.round(dirX * step);
+                    const offsetY = Math.round(dirY * step);
                     
-                    // Use original pixel color for the line
-                    heightMapData[targetIndex] = r;
-                    heightMapData[targetIndex + 1] = g;
-                    heightMapData[targetIndex + 2] = b;
-                    heightMapData[targetIndex + 3] = 255;
+                    const targetX = x + offsetX;
+                    const targetY = y + offsetY;
+                    
+                    // Check bounds
+                    if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
+                        const targetIndex = (targetY * width + targetX) * 4;
+                        
+                        // Use original pixel color for the line
+                        heightMapData[targetIndex] = r;
+                        heightMapData[targetIndex + 1] = g;
+                        heightMapData[targetIndex + 2] = b;
+                        heightMapData[targetIndex + 3] = 255;
+                    }
                 }
             }
         }
