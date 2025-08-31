@@ -370,10 +370,7 @@ class MovementEngine {
         const totalPixels = pixelPositions.length;
         const scatterCount = Math.floor((effectiveStrength / 100) * totalPixels / 3); // Divide by 3 since we apply every 3 frames
         
-        console.log(`Scatter debug: totalPixels=${totalPixels}, scatterStrength=${effectiveStrength}, scatterCount=${scatterCount}`);
-        
         if (scatterCount === 0) {
-            console.log("Scatter count is 0 - no pixels will be scattered");
             return;
         }
         
@@ -385,7 +382,6 @@ class MovementEngine {
         }
         
         const scatteredArray = Array.from(scatteredPixels);
-        console.log(`Scattering ${scatteredArray.length} unique pixels: first few indices:`, scatteredArray.slice(0, 5));
         
         // Apply random velocities to scattered pixels
         scatteredArray.forEach((pixelIndex, arrayIndex) => {
@@ -411,16 +407,8 @@ class MovementEngine {
             pixelPositions[pixelIndex].x += Math.cos(angle) * jumpDistance;
             pixelPositions[pixelIndex].y += Math.sin(angle) * jumpDistance;
             
-            // Debug first few scattered pixels
-            if (arrayIndex < 5) {
-                console.log(`Pixel ${pixelIndex} scattered: (${oldX.toFixed(1)}, ${oldY.toFixed(1)}) -> (${pixelPositions[pixelIndex].x.toFixed(1)}, ${pixelPositions[pixelIndex].y.toFixed(1)}) jump=${jumpDistance.toFixed(1)}`);
-            }
         });
         
-        // Debug logging
-        if (this.frameCount % 120 === 0 && scatterCount > 0) {
-            console.log(`Scatter: ${scatterCount} pixels scattered (${effectiveStrength}%), total affected per second: ~${scatterCount * 6}`);
-        }
     }
 
 
@@ -493,10 +481,6 @@ class MovementEngine {
             interferenceApplied++;
         }
         
-        // Debug logging every 120 frames
-        if (this.frameCount % 120 === 0 && this.params.scanLineInterference > 0) {
-            console.log(`Scan Line Interference: strength=${this.params.scanLineInterference}, spacing=${scanLineSpacing.toFixed(1)}, displacement=${maxDisplacement.toFixed(1)}, affected=${interferenceApplied} pixels`);
-        }
     }
 
     applyKaleidoscopeFractal() {
@@ -618,10 +602,6 @@ class MovementEngine {
             fractalsApplied++;
         }
         
-        // Debug logging
-        if (this.frameCount % 120 === 0) {
-            console.log(`Kaleidoscope Fractal: strength=${this.params.kaleidoscopeFractal}, segments=${this.kaleidoscopeSegments}, affected=${fractalsApplied} pixels, rotation=${(this.kaleidoscopeRotation * 180 / Math.PI).toFixed(1)}°`);
-        }
     }
 
     applyTrails() {
@@ -686,10 +666,6 @@ class MovementEngine {
             trailsApplied++;
         }
         
-        // Debug logging
-        if (this.frameCount % 120 === 0 && this.params.trails > 0) {
-            console.log(`Trails: ${this.params.trails * 10}% coverage, ${this.trailPixels.size} pixels trailing, max length: ${maxTrailLength}`);
-        }
     }
 
     updateTrailPixelSelection(targetCount, totalPixels) {
@@ -771,16 +747,6 @@ class MovementEngine {
         // Restore canvas state
         this.ctx.restore();
         
-        // Debug logging with more detail
-        if (this.frameCount % 60 === 0 && this.params.trails > 0) {
-            let shortTrails = 0;
-            let validTrails = 0;
-            for (let data of this.trailHistory.values()) {
-                if (data.length < 2) shortTrails++;
-                else validTrails++;
-            }
-            console.log(`TRAILS DEBUG: ${trailsDrawn} trails drawn, ${this.trailPixels.size} selected pixels, ${this.trailHistory.size} in history (${validTrails} valid, ${shortTrails} too short)`);
-        }
     }
 
     getPixelColor(pixelIndex) {
