@@ -47,6 +47,9 @@ class MovementEngine {
         this.gravityWells = [];
         this.gravityRadius = 200; // Pixels within this radius are affected
         
+        // Height map effect optimization
+        this.heightMapBuffer = null; // Reused buffer to avoid allocations
+        
         // Scan line interference system
         this.scanLinePhase = 0; // For animating the interference pattern
         
@@ -1195,20 +1198,33 @@ class MovementEngine {
         const data = frameData.data;
         const strength = this.params.heightMapStrength;
         
-        // Create a new image data for the height map effect
-        const heightMapData = new Uint8ClampedArray(data.length);
+        // Reuse height map buffer to avoid allocation
+        if (!this.heightMapBuffer || this.heightMapBuffer.length !== data.length) {
+            this.heightMapBuffer = new Uint8ClampedArray(data.length);
+        }
+        const heightMapData = this.heightMapBuffer;
         
-        // Clear with black
-        for (let i = 0; i < heightMapData.length; i += 4) {
-            heightMapData[i] = 0;     // R
-            heightMapData[i + 1] = 0; // G  
-            heightMapData[i + 2] = 0; // B
-            heightMapData[i + 3] = 255; // A
+        // Fast clear using fill
+        heightMapData.fill(0);
+        // Set alpha channel to 255
+        for (let i = 3; i < heightMapData.length; i += 4) {
+            heightMapData[i] = 255;
         }
         
-        // Process each pixel
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
+        // Pre-calculate common values
+        const maxHeight = (height * 0.3) | 0; // Bitwise OR for integer conversion
+        const rotationSpeed = this.frameCount * 0.02 * this.params.heightMapRotationSpeed;
+        const halfWidth = width * 0.5;
+        const halfHeight = height * 0.5;
+        const strengthMaxHeight = strength * maxHeight;
+        const blendFactor = strength;
+        const invBlendFactor = 1 - blendFactor;
+        
+        // Process every 2nd pixel to reduce computation (can be made configurable)
+        const step = Math.max(1, (2 - strength) | 0); // Higher strength = smaller step
+        
+        for (let y = 0; y < height; y += step) {
+            for (let x = 0; x < width; x += step) {
                 const pixelIndex = (y * width + x) * 4;
                 
                 // Get original pixel color
@@ -1216,50 +1232,45 @@ class MovementEngine {
                 const g = data[pixelIndex + 1];
                 const b = data[pixelIndex + 2];
                 
-                // Calculate brightness (0-1)
-                const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+                // Fast brightness calculation using bit shifts
+                const brightness = (r * 77 + g * 151 + b * 28) >> 8; // Approximate /255 with >>8
                 
-                // Calculate height based on brightness
-                const maxHeight = Math.floor(height * 0.3); // Max 30% of canvas height
-                const lineHeight = Math.floor(brightness * maxHeight * strength);
+                // Calculate line height
+                const lineHeight = (brightness * strengthMaxHeight) >> 8;
                 
-                // Calculate rotation angle based on time and position
-                const rotationSpeed = this.frameCount * 0.02 * this.params.heightMapRotationSpeed; // User-controlled rotation
-                const baseAngle = Math.atan2(y - height/2, x - width/2); // Radial pattern
-                const rotationAngle = rotationSpeed + baseAngle * 0.5; // Combine time and position
+                if (lineHeight <= 0) continue;
                 
-                // Calculate direction vector for rotated line
-                const dirX = Math.cos(rotationAngle + Math.PI/2); // Start perpendicular (vertical)
+                // Pre-calculate angle components
+                const baseAngle = Math.atan2(y - halfHeight, x - halfWidth);
+                const rotationAngle = rotationSpeed + baseAngle * 0.5;
+                const dirX = Math.cos(rotationAngle + Math.PI/2);
                 const dirY = Math.sin(rotationAngle + Math.PI/2);
                 
-                // Draw rotated line
-                for (let step = 0; step < lineHeight; step++) {
-                    const offsetX = Math.round(dirX * step);
-                    const offsetY = Math.round(dirY * step);
+                // Draw line with optimized bounds checking
+                const maxSteps = Math.min(lineHeight, 50); // Cap max line length for performance
+                for (let lineStep = 0; lineStep < maxSteps; lineStep++) {
+                    const targetX = (x + dirX * lineStep) | 0;
+                    const targetY = (y + dirY * lineStep) | 0;
                     
-                    const targetX = x + offsetX;
-                    const targetY = y + offsetY;
+                    // Single bounds check
+                    if ((targetX | targetY) < 0 || targetX >= width || targetY >= height) continue;
                     
-                    // Check bounds
-                    if (targetX >= 0 && targetX < width && targetY >= 0 && targetY < height) {
-                        const targetIndex = (targetY * width + targetX) * 4;
-                        
-                        // Use original pixel color for the line
-                        heightMapData[targetIndex] = r;
-                        heightMapData[targetIndex + 1] = g;
-                        heightMapData[targetIndex + 2] = b;
-                        heightMapData[targetIndex + 3] = 255;
-                    }
+                    const targetIndex = (targetY * width + targetX) * 4;
+                    
+                    // Use original pixel color for the line
+                    heightMapData[targetIndex] = r;
+                    heightMapData[targetIndex + 1] = g;
+                    heightMapData[targetIndex + 2] = b;
+                    heightMapData[targetIndex + 3] = 255;
                 }
             }
         }
         
-        // Blend the height map with the original image
-        const blendFactor = strength;
+        // Optimized blending without Math.floor
         for (let i = 0; i < data.length; i += 4) {
-            data[i] = Math.floor(data[i] * (1 - blendFactor) + heightMapData[i] * blendFactor);
-            data[i + 1] = Math.floor(data[i + 1] * (1 - blendFactor) + heightMapData[i + 1] * blendFactor);
-            data[i + 2] = Math.floor(data[i + 2] * (1 - blendFactor) + heightMapData[i + 2] * blendFactor);
+            data[i] = (data[i] * invBlendFactor + heightMapData[i] * blendFactor) | 0;
+            data[i + 1] = (data[i + 1] * invBlendFactor + heightMapData[i + 1] * blendFactor) | 0;
+            data[i + 2] = (data[i + 2] * invBlendFactor + heightMapData[i + 2] * blendFactor) | 0;
         }
         
         // Update the canvas
