@@ -7,12 +7,12 @@ class SimpleMP4Exporter {
         this.frameCount = 0;
         this.startTime = 0;
         
-        // Export settings - use simple codec names that work
+        // Export settings - optimized for highest quality
         this.settings = {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 20000000 // 20 Mbps for higher quality
+            bitrate: 50000000 // 50 Mbps for maximum quality
         };
         
         this.workingCodec = null;
@@ -93,9 +93,10 @@ class SimpleMP4Exporter {
                 height: this.settings.height,
                 bitrate: this.settings.bitrate,
                 framerate: this.settings.fps,
-                bitrateMode: 'variable',
-                latencyMode: 'realtime',
+                bitrateMode: 'constant',
+                latencyMode: 'quality',
                 hardwareAcceleration: 'prefer-hardware',
+                scalabilityMode: 'L1T1',
                 avc: { format: 'avc' }
             };
             
@@ -115,14 +116,16 @@ class SimpleMP4Exporter {
     }
 
     async findWorkingCodec() {
-        // Test H.264 codecs only - we need MP4 output
+        // Test H.264 codecs prioritizing highest quality profiles
         const codecsToTest = [
-            { name: 'H.264 Baseline', webCodecs: 'avc1.42E01E' },
-            { name: 'H.264 Baseline Alt1', webCodecs: 'avc1.42001E' },
-            { name: 'H.264 Baseline Alt2', webCodecs: 'avc1.420028' },
-            { name: 'H.264 Baseline Alt3', webCodecs: 'avc1.42C01E' },
-            { name: 'H.264 Main', webCodecs: 'avc1.4D401E' },
-            { name: 'H.264 High', webCodecs: 'avc1.64001E' }
+            { name: 'H.264 High L5.0', webCodecs: 'avc1.640032' },
+            { name: 'H.264 High L4.2', webCodecs: 'avc1.64002A' },
+            { name: 'H.264 High L4.0', webCodecs: 'avc1.640028' },
+            { name: 'H.264 High L3.1', webCodecs: 'avc1.64001F' },
+            { name: 'H.264 High L3.0', webCodecs: 'avc1.64001E' },
+            { name: 'H.264 Main L3.1', webCodecs: 'avc1.4D401F' },
+            { name: 'H.264 Main L3.0', webCodecs: 'avc1.4D401E' },
+            { name: 'H.264 Baseline', webCodecs: 'avc1.42E01E' }
         ];
         
         console.log('Testing H.264 codecs for MP4 compatibility:');
@@ -165,8 +168,8 @@ class SimpleMP4Exporter {
                 timestamp: timestamp
             });
 
-            // Encode the frame - keyframe every ~2 seconds for better quality
-            const keyFrame = this.frameCount % (this.settings.fps * 2) === 0;
+            // Encode the frame - keyframe every 1 second for better quality and seeking
+            const keyFrame = this.frameCount === 0 || this.frameCount % this.settings.fps === 0;
             this.videoEncoder.encode(videoFrame, { keyFrame });
             
             // Clean up the frame

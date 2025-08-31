@@ -10,13 +10,13 @@ class WebCodecsMP4Exporter {
         this.frameCount = 0;
         this.startTime = 0;
         
-        // Export settings
+        // Export settings optimized for highest quality
         this.settings = {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 20000000, // 20 Mbps for higher quality
-            codec: 'avc1.64001E' // Prefer H.264 High profile when available
+            bitrate: 50000000, // 50 Mbps for maximum quality
+            codec: 'avc1.640028' // H.264 High profile Level 4.0 for best quality
         };
     }
 
@@ -95,14 +95,13 @@ class WebCodecsMP4Exporter {
                 width: this.settings.width,
                 height: this.settings.height,
                 bitrate: this.settings.bitrate,
-                bitrateMode: 'variable', // Allow encoder to allocate bits where needed
+                bitrateMode: 'constant', // Constant bitrate for consistent quality
                 framerate: this.settings.fps,
-                latencyMode: 'realtime', // Reduce stutter by hinting realtime
+                latencyMode: 'quality', // Prioritize quality over speed
                 hardwareAcceleration: 'prefer-hardware',
+                scalabilityMode: 'L1T1', // Single layer for highest quality
                 avc: {
-                    format: 'avc',
-                    // Prefer High or Main profiles; browsers may ignore but safe
-                    // Note: profile/level hints are UA-dependent
+                    format: 'avc'
                 }
             });
 
@@ -129,10 +128,11 @@ class WebCodecsMP4Exporter {
                 timestamp: (this.frameCount * 1000000) / this.settings.fps // microseconds
             });
 
-            // Encode the frame
-            // Keyframe interval ~2s (GOP = fps * 2)
-            const gop = this.settings.fps * 2;
-            this.videoEncoder.encode(videoFrame, { keyFrame: this.frameCount % gop === 0 });
+            // Encode the frame with optimal keyframe interval
+            // Shorter GOP (1 second) for better quality and seeking
+            const gop = this.settings.fps;
+            const keyFrame = this.frameCount === 0 || this.frameCount % gop === 0;
+            this.videoEncoder.encode(videoFrame, { keyFrame });
             
             // Clean up the frame
             videoFrame.close();
@@ -212,17 +212,17 @@ class WebCodecsMP4Exporter {
             return { supported: false, reason: 'WebCodecs API not available' };
         }
 
-        // Test multiple codec options for WebCodecs
-        // Prioritize VP9/VP8 since mp4-muxer works better with those
+        // Test highest quality codec options first
         const codecsToTest = [
-            // Prefer H.264 High/Main for MP4 quality
-            'avc1.640028',   // H.264 High (L4.0)
-            'avc1.64001E',   // H.264 High (L3.0)
-            'avc1.4D401E',   // H.264 Main
-            'avc1.42E01E',   // H.264 Baseline
-            // Keep VP9/VP8 last as fallbacks (may be used in WebM container)
-            'vp09.00.10.08',
-            'vp8'
+            // H.264 High profiles for maximum quality
+            'avc1.640032',   // H.264 High (L5.0) - best quality
+            'avc1.64002A',   // H.264 High (L4.2) - excellent quality
+            'avc1.640028',   // H.264 High (L4.0) - very good quality
+            'avc1.64001F',   // H.264 High (L3.1) - good quality
+            'avc1.64001E',   // H.264 High (L3.0) - decent quality
+            'avc1.4D401F',   // H.264 Main (L3.1) - fallback
+            'avc1.4D401E',   // H.264 Main (L3.0) - fallback
+            'avc1.42E01E',   // H.264 Baseline - last resort
         ];
 
         for (const codec of codecsToTest) {

@@ -6,12 +6,12 @@ class VideoExporter {
         this.stream = null;
         this.canvas = null;
         
-        // Export settings
+        // Export settings - optimized for highest quality
         this.settings = {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 20000000, // 20 Mbps for higher quality
+            bitrate: 50000000, // 50 Mbps for maximum quality
             format: 'mp4', // or 'webm'
             codec: 'h264' // or 'vp9'
         };
@@ -100,13 +100,17 @@ class VideoExporter {
     }
 
     getMimeType() {
-        // Try MP4 formats first
+        // Try MP4 formats first - prioritize highest quality profiles
         const mp4Formats = [
-            // Prefer High/Main profiles for better quality
-            'video/mp4;codecs=avc1.640028', // H.264 High profile
-            'video/mp4;codecs=avc1.64001E', // H.264 High profile (alt)
-            'video/mp4;codecs=avc1.4D401E', // H.264 Main profile
-            'video/mp4;codecs=avc1.42E01E', // H.264 Baseline profile
+            // Try highest quality H.264 profiles first
+            'video/mp4;codecs="avc1.640032,mp4a.40.2"', // H.264 High L5.0 + AAC
+            'video/mp4;codecs="avc1.64002A,mp4a.40.2"', // H.264 High L4.2 + AAC
+            'video/mp4;codecs="avc1.640028,mp4a.40.2"', // H.264 High L4.0 + AAC
+            'video/mp4;codecs="avc1.64001F,mp4a.40.2"', // H.264 High L3.1 + AAC
+            'video/mp4;codecs="avc1.64001E,mp4a.40.2"', // H.264 High L3.0 + AAC
+            'video/mp4;codecs="avc1.4D401F,mp4a.40.2"', // H.264 Main L3.1 + AAC
+            'video/mp4;codecs="avc1.4D401E,mp4a.40.2"', // H.264 Main L3.0 + AAC
+            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"', // H.264 Baseline + AAC
             'video/mp4'
         ];
 

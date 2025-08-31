@@ -7,12 +7,12 @@ class MediabunnyMP4Exporter {
         this.frameCount = 0;
         this.startTime = 0;
         
-        // Export settings
+        // Export settings - optimized for highest quality
         this.settings = {
             width: 1200,
             height: 900,
             fps: 30,
-            bitrate: 2500000, // 2.5 Mbps
+            bitrate: 50000000, // 50 Mbps for maximum quality
             videoCodec: 'avc' // 'avc' for H.264, 'vp9' for VP9
         };
     }
