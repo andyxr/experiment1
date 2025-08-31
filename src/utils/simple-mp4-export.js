@@ -66,15 +66,11 @@ class SimpleMP4Exporter {
                 fastStart: false
             };
             
-            console.log('Creating muxer with config:', muxerConfig);
             this.muxer = new Mp4Muxer.Muxer(muxerConfig);
 
             // Create video encoder
-            let chunksReceived = 0;
             this.videoEncoder = new VideoEncoder({
                 output: (chunk, metadata) => {
-                    chunksReceived++;
-                    console.log(`Received encoded chunk ${chunksReceived}: type=${chunk.type}, size=${chunk.byteLength}, timestamp=${chunk.timestamp}`);
                     try {
                         this.muxer.addVideoChunk(chunk, metadata);
                     } catch (error) {
@@ -100,14 +96,12 @@ class SimpleMP4Exporter {
                 avc: { format: 'avc' }
             };
             
-            console.log('Configuring VideoEncoder with:', encoderConfig);
             this.videoEncoder.configure(encoderConfig);
 
             this.frameCount = 0;
             this.startTime = performance.now();
             this.isRecording = true;
 
-            console.log(`Simple MP4 recording started with codec: ${this.workingCodec.webCodecs}`);
             return true;
         } catch (error) {
             console.error('Failed to start simple MP4 recording:', error);
@@ -128,8 +122,6 @@ class SimpleMP4Exporter {
             { name: 'H.264 Baseline', webCodecs: 'avc1.42E01E' }
         ];
         
-        console.log('Testing H.264 codecs for MP4 compatibility:');
-        codecsToTest.forEach(codec => console.log(`- ${codec.name}: ${codec.webCodecs}`));
 
         for (const codec of codecsToTest) {
             try {
@@ -142,9 +134,7 @@ class SimpleMP4Exporter {
                 };
 
                 const support = await VideoEncoder.isConfigSupported(config);
-                console.log(`Testing ${codec.name} (${codec.webCodecs}): ${support.supported ? 'SUPPORTED' : 'NOT SUPPORTED'}`);
                 if (support.supported) {
-                    console.log(`✓ Selected codec: ${codec.name} (${codec.webCodecs})`);
                     return { success: true, codec: codec };
                 }
             } catch (error) {
@@ -152,7 +142,6 @@ class SimpleMP4Exporter {
             }
         }
 
-        console.log('❌ No H.264 codecs supported by this browser - MP4 export not possible');
         return { success: false, error: 'No H.264 codecs supported - MP4 export requires H.264 encoding' };
     }
 
@@ -177,10 +166,6 @@ class SimpleMP4Exporter {
             
             this.frameCount++;
             
-            // Log progress every 30 frames
-            if (this.frameCount % 30 === 0) {
-                console.log(`Recorded ${this.frameCount} frames, last timestamp: ${timestamp}μs`);
-            }
         } catch (error) {
             console.error('Error recording frame:', error);
         }
@@ -194,22 +179,15 @@ class SimpleMP4Exporter {
         this.isRecording = false;
 
         try {
-            console.log(`Stopping recording: ${this.frameCount} frames recorded`);
-            
             // Flush encoder and wait for all chunks
-            console.log('Flushing video encoder...');
             await this.videoEncoder.flush();
-            
-            console.log('Closing video encoder...');
             this.videoEncoder.close();
 
             // Finalize muxer
-            console.log('Finalizing muxer...');
             this.muxer.finalize();
 
             // Get the MP4 data
             const buffer = this.muxer.target.buffer;
-            console.log(`Muxer produced buffer of size: ${buffer.byteLength} bytes`);
             
             if (buffer.byteLength === 0) {
                 throw new Error('Muxer produced empty buffer');
@@ -219,8 +197,6 @@ class SimpleMP4Exporter {
             const url = URL.createObjectURL(blob);
 
             const duration = (performance.now() - this.startTime) / 1000;
-
-            console.log(`Simple MP4 recording complete: ${this.frameCount} frames, ${duration.toFixed(2)}s, ${blob.size} bytes`);
 
             return {
                 blob,
