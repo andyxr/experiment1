@@ -69,8 +69,10 @@ class SimpleMP4Exporter {
             this.muxer = new Mp4Muxer.Muxer(muxerConfig);
 
             // Create video encoder
+            let chunksReceived = 0;
             this.videoEncoder = new VideoEncoder({
                 output: (chunk, metadata) => {
+                    chunksReceived++;
                     try {
                         this.muxer.addVideoChunk(chunk, metadata);
                     } catch (error) {
