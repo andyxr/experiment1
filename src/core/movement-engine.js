@@ -278,6 +278,11 @@ class MovementEngine {
                     width, height, this.params.flowStrength, time
                 );
                 break;
+            case 'ifsFractal':
+                flowField = this.perlinFlow.createIFSFractalFlow(
+                    width, height, this.params.flowStrength, time
+                );
+                break;
             default: // 'perlin'
                 flowField = this.perlinFlow.createFlowField(width, height, scale, time);
                 break;

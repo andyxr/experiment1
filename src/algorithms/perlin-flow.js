@@ -1136,6 +1136,120 @@ class PerlinFlow {
         return field;
     }
 
+    createIFSFractalFlow(width, height, strength = 1.0, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        // Create self-similar flow patterns at multiple scales
+        // This creates the fractal "texture" rather than trying to create the fractal shape itself
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // Normalize coordinates to [0,1] range
+                const nx = x / width;
+                const ny = y / height;
+                
+                // Create multiple scales of self-similar patterns
+                let totalX = 0, totalY = 0;
+                
+                // Scale 1: Large triangular pattern (1:1 scale)
+                const angle1 = this.calculateTriangularFlow(nx, ny, 1.0, timeOffset);
+                const magnitude1 = this.calculateTriangularMagnitude(nx, ny, 1.0, timeOffset);
+                totalX += Math.cos(angle1) * magnitude1 * 1.0;
+                totalY += Math.sin(angle1) * magnitude1 * 1.0;
+                
+                // Scale 2: Medium triangular pattern (1:2 scale - half size)
+                const angle2 = this.calculateTriangularFlow(nx * 2, ny * 2, 0.5, timeOffset * 1.5);
+                const magnitude2 = this.calculateTriangularMagnitude(nx * 2, ny * 2, 0.5, timeOffset * 1.5);
+                totalX += Math.cos(angle2) * magnitude2 * 0.6;
+                totalY += Math.sin(angle2) * magnitude2 * 0.6;
+                
+                // Scale 3: Small triangular pattern (1:4 scale - quarter size)  
+                const angle3 = this.calculateTriangularFlow(nx * 4, ny * 4, 0.25, timeOffset * 2.0);
+                const magnitude3 = this.calculateTriangularMagnitude(nx * 4, ny * 4, 0.25, timeOffset * 2.0);
+                totalX += Math.cos(angle3) * magnitude3 * 0.3;
+                totalY += Math.sin(angle3) * magnitude3 * 0.3;
+                
+                // Apply strength scaling - this should now work properly
+                const scaledX = totalX * strength * 0.8;
+                const scaledY = totalY * strength * 0.8;
+                
+                field[index] = {
+                    x: scaledX,
+                    y: scaledY,
+                    magnitude: Math.sqrt(scaledX * scaledX + scaledY * scaledY),
+                    ifsFractal: true
+                };
+            }
+        }
+        
+        return field;
+    }
+    
+    // Helper function to calculate triangular flow direction based on position within a triangle
+    calculateTriangularFlow(nx, ny, scale, timeOffset) {
+        // Wrap coordinates to [0,1] to create tiling
+        const wx = (nx % 1 + 1) % 1;
+        const wy = (ny % 1 + 1) % 1;
+        
+        // Determine which triangle region we're in (like sierpinski subdivisions)
+        let regionAngle = 0;
+        
+        // Top triangle region
+        if (wy > 0.5 && wx < 0.5) {
+            regionAngle = -Math.PI / 2; // Upward
+        }
+        // Bottom-left triangle region  
+        else if (wy <= 0.5 && wx < wy) {
+            regionAngle = Math.PI * 5 / 6; // Up-left
+        }
+        // Bottom-right triangle region
+        else {
+            regionAngle = Math.PI / 6; // Up-right
+        }
+        
+        // Add time-based rotation
+        regionAngle += timeOffset * (1.0 + scale);
+        
+        // Add some position-based variation
+        regionAngle += Math.sin(wx * Math.PI * 6) * 0.3;
+        regionAngle += Math.cos(wy * Math.PI * 4) * 0.2;
+        
+        return regionAngle;
+    }
+    
+    // Helper function to calculate magnitude based on position within triangle regions
+    calculateTriangularMagnitude(nx, ny, scale, timeOffset) {
+        const wx = (nx % 1 + 1) % 1;
+        const wy = (ny % 1 + 1) % 1;
+        
+        // Distance from center of current tile
+        const centerX = 0.5;
+        const centerY = 0.5;
+        const distFromCenter = Math.sqrt((wx - centerX) * (wx - centerX) + (wy - centerY) * (wy - centerY));
+        
+        // Distance from corners (where triangular forces are strongest)
+        const corners = [
+            {x: 0, y: 0}, {x: 1, y: 0}, {x: 0.5, y: 1}
+        ];
+        
+        let minCornerDist = Infinity;
+        corners.forEach(corner => {
+            const dist = Math.sqrt((wx - corner.x) * (wx - corner.x) + (wy - corner.y) * (wy - corner.y));
+            minCornerDist = Math.min(minCornerDist, dist);
+        });
+        
+        // Stronger forces near corners, weaker in center
+        let baseMagnitude = (1.0 - minCornerDist) * 0.7 + 0.1;
+        
+        // Add time-based pulsing
+        baseMagnitude *= (Math.sin(timeOffset * 2 + distFromCenter * 8) * 0.3 + 0.7);
+        
+        // Scale by the fractal level
+        return baseMagnitude * scale;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         
