@@ -1250,6 +1250,88 @@ class PerlinFlow {
         return baseMagnitude * scale;
     }
 
+    createBlackHoleFlow(width, height, strength = 1.0, timeOffset = 0) {
+        const field = new Array(width * height);
+        
+        // Initialize black hole center if not set (only once)
+        if (!this.blackHoleCenter) {
+            this.blackHoleCenter = {
+                x: Math.random() * width,
+                y: Math.random() * height
+            };
+        }
+        
+        const blackHoleX = this.blackHoleCenter.x;
+        const blackHoleY = this.blackHoleCenter.y;
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                
+                // Calculate distance and direction to black hole
+                const dx = blackHoleX - x;
+                const dy = blackHoleY - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 1) {
+                    // Very close to black hole center - minimal movement to avoid singularity
+                    field[index] = { x: 0, y: 0, magnitude: 0, blackHole: true };
+                    continue;
+                }
+                
+                // Normalize direction vectors
+                const directionX = dx / distance;
+                const directionY = dy / distance;
+                
+                // Calculate tangential vector (perpendicular for orbital motion)
+                const tangentialX = -directionY; // 90-degree rotation
+                const tangentialY = directionX;
+                
+                // Black hole strength based on inverse square law (like gravity)
+                // But capped to prevent infinite forces
+                const gravityStrength = Math.min(strength * 200, strength * 50000 / Math.max(distance * distance, 25));
+                
+                // Orbital velocity - stronger closer to black hole (like real physics)
+                const orbitalStrength = Math.min(strength * 100, strength * 8000 / Math.max(distance, 10));
+                
+                // Create spiral inward motion
+                // As strength increases, more inward pull vs orbital motion
+                const inwardRatio = Math.min(0.8, strength * 0.2); // Higher strength = more inward pull
+                const orbitalRatio = 1.0 - inwardRatio;
+                
+                // Add time-based rotation to make the spiral dynamic
+                const timeRotation = timeOffset * 0.5;
+                const rotatedTangentialX = tangentialX * Math.cos(timeRotation) - tangentialY * Math.sin(timeRotation);
+                const rotatedTangentialY = tangentialX * Math.sin(timeRotation) + tangentialY * Math.cos(timeRotation);
+                
+                // Combine inward gravitational pull with orbital motion
+                const finalX = (directionX * gravityStrength * inwardRatio) + 
+                              (rotatedTangentialX * orbitalStrength * orbitalRatio);
+                const finalY = (directionY * gravityStrength * inwardRatio) + 
+                              (rotatedTangentialY * orbitalStrength * orbitalRatio);
+                
+                // Add some noise for more organic motion
+                const noiseValue = this.noise2D(x * 0.01 + timeOffset, y * 0.01 + timeOffset);
+                const noiseStrength = strength * 0.5;
+                const noiseX = Math.cos(noiseValue * Math.PI * 2) * noiseStrength;
+                const noiseY = Math.sin(noiseValue * Math.PI * 2) * noiseStrength;
+                
+                const resultX = finalX + noiseX;
+                const resultY = finalY + noiseY;
+                
+                field[index] = {
+                    x: resultX,
+                    y: resultY,
+                    magnitude: Math.sqrt(resultX * resultX + resultY * resultY),
+                    blackHole: true,
+                    distance: distance // For potential visual effects
+                };
+            }
+        }
+        
+        return field;
+    }
+
     interpolateField(field1, field2, factor, width, height) {
         const result = new Array(width * height);
         

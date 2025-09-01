@@ -283,6 +283,11 @@ class MovementEngine {
                     width, height, this.params.flowStrength, time
                 );
                 break;
+            case 'blackHole':
+                flowField = this.perlinFlow.createBlackHoleFlow(
+                    width, height, this.params.flowStrength, time
+                );
+                break;
             default: // 'perlin'
                 flowField = this.perlinFlow.createFlowField(width, height, scale, time);
                 break;
